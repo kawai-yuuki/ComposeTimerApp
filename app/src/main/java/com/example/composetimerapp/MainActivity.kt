@@ -1,25 +1,35 @@
 package com.example.composetimerapp
 
 import android.annotation.SuppressLint
+import android.content.Context
+import android.os.Build
 import android.os.Bundle
+import android.os.VibrationEffect
+import android.os.Vibrator
+import android.util.Log
+import android.widget.Toast
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.compose.foundation.layout.*
-import androidx.compose.material3.Button
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Surface
-import androidx.compose.material3.Text
-import androidx.compose.material3.Slider
+import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.navigation.compose.*
-import androidx.navigation.compose.rememberNavController
 import com.example.composetimerapp.ui.theme.ComposeTimerAppTheme
 import kotlinx.coroutines.delay
+
+// 時間を分:秒形式にフォーマットする関数（トップレベルに定義）
+@SuppressLint("DefaultLocale")
+fun formatTime(seconds: Long): String {
+    val minutesPart = seconds / 60
+    val secondsPart = seconds % 60
+    return String.format("%02d:%02d", minutesPart, secondsPart)
+}
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -40,7 +50,7 @@ class MainActivity : ComponentActivity() {
 @Composable
 fun AppNavigation() {
     val navController = rememberNavController()
-    NavHost(navController = navController, startDestination = "start") {
+    NavHost(navController, startDestination = "start") {
         composable("start") {
             StartScreen(onStartClick = { navController.navigate("timer") })
         }
@@ -74,8 +84,20 @@ fun StartScreen(onStartClick: () -> Unit) {
     }
 }
 
+@SuppressLint("UnusedMaterial3ScaffoldPaddingParameter")
 @Composable
 fun TimerScreen() {
+    // コンテキストの取得
+    val context = LocalContext.current
+    val vibrator = remember {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            context.getSystemService(Vibrator::class.java)
+        } else {
+            @Suppress("DEPRECATION")
+            context.getSystemService(Context.VIBRATOR_SERVICE) as Vibrator?
+        }
+    }
+
     // タイマーの状態管理
     var timeLeft by remember { mutableLongStateOf(60L) } // 初期値: 60秒
     var isRunning by remember { mutableStateOf(false) }
@@ -92,10 +114,35 @@ fun TimerScreen() {
         }
         if (timeLeft <= 0 && isRunning) {
             isRunning = false
-            // タイマー終了時の処理（例: トーストメッセージなど）
-            // トーストメッセージを表示する場合は以下を有効にしてください
-            // val context = LocalContext.current
-            // Toast.makeText(context, "Timer Finished!", Toast.LENGTH_SHORT).show()
+            // タイマー終了の通知
+            Log.d("TimerScreen", "タイマーが終了しました。")
+            Toast.makeText(context, "タイマーが終了しました！", Toast.LENGTH_SHORT).show()
+
+            // バイブレーションの実行
+            if (vibrator?.hasVibrator() == true) {
+                try {
+                    // バイブレーションパターンの定義
+                    val pattern = longArrayOf(0, 500, 200, 500) // 0ms待機、500ms振動、200ms待機、500ms振動
+                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                        vibrator.vibrate(
+                            VibrationEffect.createWaveform(
+                                pattern,
+                                -1 // 繰り返しなし
+                            )
+                        )
+                    } else {
+                        @Suppress("DEPRECATION")
+                        vibrator.vibrate(pattern, -1)
+                    }
+                    Log.d("TimerScreen", "バイブレーションを実行しました。")
+                } catch (e: Exception) {
+                    Log.e("TimerScreen", "バイブレーションに失敗しました: ${e.message}")
+                    Toast.makeText(context, "バイブレーションに失敗しました！", Toast.LENGTH_SHORT).show()
+                }
+            } else {
+                Log.e("TimerScreen", "デバイスはバイブレーションをサポートしていません。")
+                Toast.makeText(context, "デバイスはバイブレーションをサポートしていません。", Toast.LENGTH_SHORT).show()
+            }
         }
     }
 
@@ -183,13 +230,40 @@ fun TimerScreen() {
                 Text("Reset")
             }
         }
-    }
-}
 
-// 時間を分:秒形式にフォーマットする関数
-@SuppressLint("DefaultLocale")
-fun formatTime(seconds: Long): String {
-    val minutesPart = seconds / 60
-    val secondsPart = seconds % 60
-    return String.format("%02d:%02d", minutesPart, secondsPart)
+        // テスト用バイブレーションボタンの追加
+        Spacer(modifier = Modifier.height(16.dp))
+        Button(
+            onClick = {
+                if (vibrator?.hasVibrator() == true) {
+                    try {
+                        // バイブレーションパターンの定義
+                        val pattern = longArrayOf(0, 500, 200, 500) // 0ms待機、500ms振動、200ms待機、500ms振動
+                        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                            vibrator.vibrate(
+                                VibrationEffect.createWaveform(
+                                    pattern,
+                                    -1 // 繰り返しなし
+                                )
+                            )
+                        } else {
+                            @Suppress("DEPRECATION")
+                            vibrator.vibrate(pattern, -1)
+                        }
+                        Toast.makeText(context, "バイブレーションを実行しました！", Toast.LENGTH_SHORT).show()
+                        Log.d("TimerScreen", "テストバイブレーションを実行しました。")
+                    } catch (e: Exception) {
+                        Log.e("TimerScreen", "テストバイブレーションに失敗しました: ${e.message}")
+                        Toast.makeText(context, "バイブレーションに失敗しました！", Toast.LENGTH_SHORT).show()
+                    }
+                } else {
+                    Log.e("TimerScreen", "デバイスはバイブレーションをサポートしていません。")
+                    Toast.makeText(context, "デバイスはバイブレーションをサポートしていません。", Toast.LENGTH_SHORT).show()
+                }
+            },
+            modifier = Modifier.width(200.dp)
+        ) {
+            Text("Test Vibration")
+        }
+    }
 }
