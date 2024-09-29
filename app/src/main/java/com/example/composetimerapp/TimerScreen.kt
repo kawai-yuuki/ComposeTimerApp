@@ -16,8 +16,6 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
@@ -51,6 +49,9 @@ fun TimerScreen() {
     // スライダーによる時間設定用の状態
     var selectedMinutes by remember { mutableFloatStateOf(1f) } // 初期値: 1分
     var selectedSeconds by remember { mutableFloatStateOf(0f) } // 初期値: 0秒
+
+    // 運動セッションの時間設定（秒単位）
+    var exerciseDurationSeconds by remember { mutableLongStateOf(60L) } // 初期値: 60秒
 
     // SensorManager の取得
     val sensorManager = remember {
@@ -140,7 +141,7 @@ fun TimerScreen() {
                     isShaking = false
                     continuousShakingTime = 0L
                     // バイブレーションを再開
-                    if (vibrator?.hasVibrator() == true) {
+                    if (vibrator?.hasVibrator() == true && isVibrating.not()) {
                         try {
                             val pattern = longArrayOf(0, 500, 200, 500)
                             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
@@ -178,7 +179,7 @@ fun TimerScreen() {
 
             // 運動セッションを開始
             isVibrationSessionActive = true
-            vibrationSessionTimeLeft = 60L // 1分間
+            vibrationSessionTimeLeft = exerciseDurationSeconds // 運動セッション時間
 
             // バイブレーションの実行（運動セッション開始時）
             if (vibrator?.hasVibrator() == true) {
@@ -232,7 +233,7 @@ fun TimerScreen() {
         verticalArrangement = Arrangement.Center,
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
-        // 分の選択
+        // メインタイマーの分の選択
         Text(
             text = "Minutes: ${selectedMinutes.toInt()}",
             fontSize = 18.sp,
@@ -248,7 +249,7 @@ fun TimerScreen() {
 
         Spacer(modifier = Modifier.height(24.dp))
 
-        // 秒の選択
+        // メインタイマーの秒の選択
         Text(
             text = "Seconds: ${selectedSeconds.toInt()}",
             fontSize = 18.sp,
@@ -259,6 +260,22 @@ fun TimerScreen() {
             onValueChange = { selectedSeconds = it },
             valueRange = 0f..59f,
             steps = 58, // 0から59までの整数を選択可能にする
+            modifier = Modifier.padding(horizontal = 16.dp)
+        )
+
+        Spacer(modifier = Modifier.height(24.dp))
+
+        // 運動セッションの時間設定（秒単位）の選択
+        Text(
+            text = "Exercise Duration: ${exerciseDurationSeconds}s",
+            fontSize = 18.sp,
+            modifier = Modifier.padding(bottom = 8.dp)
+        )
+        Slider(
+            value = exerciseDurationSeconds.toFloat(),
+            onValueChange = { exerciseDurationSeconds = it.toLong() },
+            valueRange = 10f..120f, // 10秒から120秒まで
+            steps = 110, // 10秒から120秒までの1秒刻み
             modifier = Modifier.padding(horizontal = 16.dp)
         )
 
@@ -281,7 +298,7 @@ fun TimerScreen() {
             modifier = Modifier.padding(bottom = 16.dp)
         )
 
-        // 連続シェイク時間の表示
+        // 連続シェイク時間の表示（運動セッション中のみ）
         if (isVibrationSessionActive) {
             Text(
                 text = "Shaking Time: ${continuousShakingTime / 1000}.${(continuousShakingTime % 1000) / 100}s",
@@ -297,14 +314,14 @@ fun TimerScreen() {
             // スタート/ポーズボタン
             Button(
                 onClick = {
-                    if (!isRunning) {
+                    if (!isRunning && !isVibrationSessionActive) {
                         // スライダーで選択された時間をタイマーに設定
                         val totalSeconds = (selectedMinutes.toInt() * 60 + selectedSeconds.toInt()).toLong()
                         if (totalSeconds > 0) {
                             timeLeft = totalSeconds
                             isRunning = true
                         }
-                    } else {
+                    } else if (isRunning) {
                         isRunning = false
                         // ポーズ時にバイブレーションをキャンセル
                         vibrator?.cancel()
@@ -323,6 +340,8 @@ fun TimerScreen() {
                     timeLeft = 60L // 初期値にリセット
                     selectedMinutes = 1f // 初期値にリセット（例: 1分）
                     selectedSeconds = 0f // 初期値にリセット
+                    // 運動セッションの時間もリセット
+                    exerciseDurationSeconds = 60L // 初期値にリセット
                     // バイブレーションをキャンセル
                     vibrator?.cancel()
                     isVibrating = false
@@ -332,7 +351,7 @@ fun TimerScreen() {
                     lastShakeTime = 0L
                     // 運動セッションもリセット
                     isVibrationSessionActive = false
-                    vibrationSessionTimeLeft = 60L
+                    vibrationSessionTimeLeft = exerciseDurationSeconds
                 },
                 modifier = Modifier.width(100.dp)
             ) {
@@ -351,7 +370,7 @@ fun TimerScreen() {
                     lastShakeTime = 0L
                     // 運動セッションもリセット
                     isVibrationSessionActive = false
-                    vibrationSessionTimeLeft = 60L
+                    vibrationSessionTimeLeft = exerciseDurationSeconds
                     Toast.makeText(context, "バイブレーションを停止しました！", Toast.LENGTH_SHORT).show()
                 },
                 modifier = Modifier.width(100.dp)
@@ -393,4 +412,5 @@ fun TimerScreen() {
             Text("Test Vibration")
         }
     }
+
 }
