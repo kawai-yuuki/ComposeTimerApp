@@ -2,6 +2,8 @@ package com.example.composetimerapp
 
 import android.annotation.SuppressLint
 import android.content.Context
+import android.hardware.Sensor
+import android.hardware.SensorManager
 import android.os.Build
 import android.os.Bundle
 import android.os.VibrationEffect
@@ -102,9 +104,45 @@ fun TimerScreen() {
     var timeLeft by remember { mutableLongStateOf(60L) } // 初期値: 60秒
     var isRunning by remember { mutableStateOf(false) }
 
-    // スクロールによる時間設定用の状態
+    // スライダーによる時間設定用の状態
     var selectedMinutes by remember { mutableFloatStateOf(1f) } // 初期値: 1分
     var selectedSeconds by remember { mutableFloatStateOf(0f) } // 初期値: 0秒
+
+    // SensorManager の取得
+    val sensorManager = remember {
+        context.getSystemService(Context.SENSOR_SERVICE) as SensorManager
+    }
+
+    // バイブレーション実行中かどうかのフラグ
+    var isVibrating by remember { mutableStateOf(false) }
+
+    // ShakeDetector のインスタンス作成
+    val shakeDetector = remember {
+        ShakeDetector(
+            onShake = {
+                // 単一のシェイクが検出された場合の処理（必要に応じて）
+                Log.d("TimerScreen", "シェイクが検出されました。")
+            },
+            onShakeContinuous = {
+                // 連続シェイクが検出された場合の処理
+                vibrator?.cancel()
+                isRunning = false
+                isVibrating = false
+                Toast.makeText(context, "バイブレーションが停止されました！", Toast.LENGTH_SHORT).show()
+                Log.d("TimerScreen", "連続シェイクによりバイブレーションが停止されました。")
+            }
+        )
+    }
+
+    // センサーリスナーの登録と解除
+    DisposableEffect(Unit) {
+        val accelerometer = sensorManager.getDefaultSensor(Sensor.TYPE_ACCELEROMETER)
+        sensorManager.registerListener(shakeDetector, accelerometer, SensorManager.SENSOR_DELAY_UI)
+
+        onDispose {
+            sensorManager.unregisterListener(shakeDetector)
+        }
+    }
 
     // タイマーの実行
     LaunchedEffect(isRunning, timeLeft) {
@@ -118,7 +156,7 @@ fun TimerScreen() {
             Log.d("TimerScreen", "タイマーが終了しました。")
             Toast.makeText(context, "タイマーが終了しました！", Toast.LENGTH_SHORT).show()
 
-            // バイブレーションの実行
+            // バイブレーションの実行（繰り返しバイブレーション）
             if (vibrator?.hasVibrator() == true) {
                 try {
                     // バイブレーションパターンの定義
@@ -127,13 +165,14 @@ fun TimerScreen() {
                         vibrator.vibrate(
                             VibrationEffect.createWaveform(
                                 pattern,
-                                -1 // 繰り返しなし
+                                0 // 繰り返し開始インデックス（0で無限に繰り返す）
                             )
                         )
                     } else {
                         @Suppress("DEPRECATION")
-                        vibrator.vibrate(pattern, -1)
+                        vibrator.vibrate(pattern, 0) // -1から0に変更して無限ループ
                     }
+                    isVibrating = true
                     Log.d("TimerScreen", "バイブレーションを実行しました。")
                 } catch (e: Exception) {
                     Log.e("TimerScreen", "バイブレーションに失敗しました: ${e.message}")
@@ -202,7 +241,7 @@ fun TimerScreen() {
             Button(
                 onClick = {
                     if (!isRunning) {
-                        // スクロールで選択された時間をタイマーに設定
+                        // スライダーで選択された時間をタイマーに設定
                         val totalSeconds = (selectedMinutes.toInt() * 60 + selectedSeconds.toInt()).toLong()
                         if (totalSeconds > 0) {
                             timeLeft = totalSeconds
@@ -210,6 +249,9 @@ fun TimerScreen() {
                         }
                     } else {
                         isRunning = false
+                        // ポーズ時にバイブレーションをキャンセル
+                        vibrator?.cancel()
+                        isVibrating = false
                     }
                 },
                 modifier = Modifier.width(100.dp)
@@ -224,10 +266,26 @@ fun TimerScreen() {
                     timeLeft = 60L // 初期値にリセット
                     selectedMinutes = 1f // 初期値にリセット（例: 1分）
                     selectedSeconds = 0f // 初期値にリセット
+                    // バイブレーションをキャンセル
+                    vibrator?.cancel()
+                    isVibrating = false
                 },
                 modifier = Modifier.width(100.dp)
             ) {
                 Text("Reset")
+            }
+
+            // ストップボタンの追加
+            Button(
+                onClick = {
+                    isRunning = false
+                    vibrator?.cancel()
+                    isVibrating = false
+                    Toast.makeText(context, "バイブレーションを停止しました！", Toast.LENGTH_SHORT).show()
+                },
+                modifier = Modifier.width(100.dp)
+            ) {
+                Text("Stop")
             }
         }
 
@@ -243,13 +301,14 @@ fun TimerScreen() {
                             vibrator.vibrate(
                                 VibrationEffect.createWaveform(
                                     pattern,
-                                    -1 // 繰り返しなし
+                                    0 // 繰り返し開始インデックス（0で無限に繰り返す）
                                 )
                             )
                         } else {
                             @Suppress("DEPRECATION")
-                            vibrator.vibrate(pattern, -1)
+                            vibrator.vibrate(pattern, 0) // -1から0に変更して無限ループ
                         }
+                        isVibrating = true
                         Toast.makeText(context, "バイブレーションを実行しました！", Toast.LENGTH_SHORT).show()
                         Log.d("TimerScreen", "テストバイブレーションを実行しました。")
                     } catch (e: Exception) {
