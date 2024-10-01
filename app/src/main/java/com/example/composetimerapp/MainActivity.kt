@@ -51,21 +51,27 @@ class MainActivity : ComponentActivity() {
 fun AppNavigation() {
     val navController = rememberNavController()
     NavHost(navController, startDestination = "start") {
+        // Start page
         composable("start") {
-            StartScreen(onStartClick = { navController.navigate("timer") })
+            StartScreen(onStartTransition = { navController.navigate("timer") })
         }
+        // Time setting page
         composable("timer") {
-            TimerScreen()
+            TimerScreen(onStartClick = {navController.navigate("wait") })
+        }
+        // waiting call page
+        composable("wait") {
+            WaitScreen(onResetClick = {navController.navigate("timer")})
         }
     }
 }
 
 @Composable
-fun StartScreen(onStartClick: () -> Unit) {
+fun StartScreen(onStartTransition: () -> Unit) {
     // 自動遷移を実装
     LaunchedEffect(Unit) {
         delay(2000L) // 2秒待機
-        onStartClick()
+        onStartTransition()
     }
 
     Column(
@@ -86,7 +92,7 @@ fun StartScreen(onStartClick: () -> Unit) {
 
 @SuppressLint("UnusedMaterial3ScaffoldPaddingParameter")
 @Composable
-fun TimerScreen() {
+fun TimerScreen(onStartClick: () -> Unit) {
     // コンテキストの取得
     val context = LocalContext.current
     val vibrator = remember {
@@ -109,6 +115,7 @@ fun TimerScreen() {
     // タイマーの実行
     LaunchedEffect(isRunning, timeLeft) {
         if (isRunning && timeLeft > 0) {
+            onStartClick()
             delay(1000L)
             timeLeft -= 1
         }
@@ -264,6 +271,59 @@ fun TimerScreen() {
             modifier = Modifier.width(200.dp)
         ) {
             Text("Test Vibration")
+        }
+    }
+}
+
+
+
+@Composable
+fun WaitScreen(onResetClick: () -> Unit) {
+    // コンテキストの取得
+    val context = LocalContext.current
+
+    // タイマーの状態管理（初期値: 10秒）
+    var timeLeft by remember { mutableLongStateOf(10L) }
+    var isRunning by remember { mutableStateOf(true) }
+
+
+    // タイマーの実行
+    LaunchedEffect(isRunning, timeLeft) {
+        if (isRunning && timeLeft > 0) {
+            delay(1000L) // 1秒ごとにカウントダウン
+            timeLeft -= 1
+        }
+        if (timeLeft <= 0 && isRunning) {
+            isRunning = false
+            // カウントダウン終了時の通知
+            Toast.makeText(context, "待機が終了しました！", Toast.LENGTH_SHORT).show()
+        }
+    }
+
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .padding(32.dp),
+        verticalArrangement = Arrangement.Center,
+        horizontalAlignment = Alignment.CenterHorizontally
+    ) {
+        // 残り時間の表示
+        Text(
+            text = "残り時間: ${formatTime(timeLeft)}",
+            style = MaterialTheme.typography.headlineMedium,
+            modifier = Modifier.padding(bottom = 32.dp)
+        )
+
+        // リセットボタン
+        Button(
+            onClick = {
+                isRunning = false
+                timeLeft = 10L // 初期値にリセット
+                onResetClick()
+            },
+            modifier = Modifier.width(100.dp)
+        ) {
+            Text("Reset")
         }
     }
 }
