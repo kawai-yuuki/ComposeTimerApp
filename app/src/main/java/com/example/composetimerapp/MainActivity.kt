@@ -49,6 +49,10 @@ class MainActivity : ComponentActivity() {
 
 @Composable
 fun AppNavigation() {
+    // timeLeftとisRunningの状態をAppNavigationで管理
+    var timeLeft by remember { mutableLongStateOf(60L) }
+    var isRunning by remember { mutableStateOf(false) }
+
     val navController = rememberNavController()
     NavHost(navController, startDestination = "start") {
         // Start page
@@ -57,11 +61,33 @@ fun AppNavigation() {
         }
         // Time setting page
         composable("timer") {
-            TimerScreen(onStartClick = {navController.navigate("wait") })
+            TimerScreen(
+                timeLeft = timeLeft,
+                isRunning = isRunning,
+                onTimeSet = { newTime -> timeLeft = newTime },
+                onStartClick = {
+                    isRunning = true
+                    navController.navigate("wait")
+                },
+                onPauseClick = {
+                    isRunning = false
+                }
+            )
         }
         // waiting call page
         composable("wait") {
-            WaitScreen(onResetClick = {navController.navigate("timer")})
+            WaitScreen(
+                timeLeft = timeLeft,
+                isRunning = isRunning,
+                onStartPauseClick = {
+                    currentIsRunning -> isRunning = !currentIsRunning // タイマーの開始と停止
+                },
+                onResetClick = {
+                    isRunning = false
+                    timeLeft = 60L // タイマーをリセット
+                    navController.navigate("timer")
+                }
+            )
         }
     }
 }
@@ -86,13 +112,18 @@ fun StartScreen(onStartTransition: () -> Unit) {
             style = MaterialTheme.typography.headlineMedium,
             modifier = Modifier.padding(bottom = 32.dp)
         )
-        // スタートボタンを削除
     }
 }
 
 @SuppressLint("UnusedMaterial3ScaffoldPaddingParameter")
 @Composable
-fun TimerScreen(onStartClick: () -> Unit) {
+fun TimerScreen(
+    timeLeft: Long,
+    isRunning: Boolean,
+    onTimeSet: (Long) -> Unit,
+    onStartClick: () -> Unit,
+    onPauseClick: () -> Unit
+) {
     // コンテキストの取得
     val context = LocalContext.current
     val vibrator = remember {
@@ -104,10 +135,6 @@ fun TimerScreen(onStartClick: () -> Unit) {
         }
     }
 
-    // タイマーの状態管理
-    var timeLeft by remember { mutableLongStateOf(60L) } // 初期値: 60秒
-    var isRunning by remember { mutableStateOf(false) }
-
     // スクロールによる時間設定用の状態
     var selectedMinutes by remember { mutableFloatStateOf(1f) } // 初期値: 1分
     var selectedSeconds by remember { mutableFloatStateOf(0f) } // 初期値: 0秒
@@ -115,14 +142,12 @@ fun TimerScreen(onStartClick: () -> Unit) {
     // タイマーの実行
     LaunchedEffect(isRunning, timeLeft) {
         if (isRunning && timeLeft > 0) {
-            onStartClick()
+            //onStartClick()
             delay(1000L)
-            timeLeft -= 1
+            onTimeSet(timeLeft - 1)
         }
         if (timeLeft <= 0 && isRunning) {
-            isRunning = false
             // タイマー終了の通知
-            Log.d("TimerScreen", "タイマーが終了しました。")
             Toast.makeText(context, "タイマーが終了しました！", Toast.LENGTH_SHORT).show()
 
             // バイブレーションの実行
@@ -212,11 +237,11 @@ fun TimerScreen(onStartClick: () -> Unit) {
                         // スクロールで選択された時間をタイマーに設定
                         val totalSeconds = (selectedMinutes.toInt() * 60 + selectedSeconds.toInt()).toLong()
                         if (totalSeconds > 0) {
-                            timeLeft = totalSeconds
-                            isRunning = true
+                            onTimeSet(totalSeconds)
+                            onStartClick()
                         }
                     } else {
-                        isRunning = false
+                        onPauseClick()
                     }
                 },
                 modifier = Modifier.width(100.dp)
@@ -227,8 +252,7 @@ fun TimerScreen(onStartClick: () -> Unit) {
             // リセットボタン
             Button(
                 onClick = {
-                    isRunning = false
-                    timeLeft = 60L // 初期値にリセット
+                    onTimeSet(60L) // 初期値にリセット
                     selectedMinutes = 1f // 初期値にリセット（例: 1分）
                     selectedSeconds = 0f // 初期値にリセット
                 },
@@ -275,28 +299,57 @@ fun TimerScreen(onStartClick: () -> Unit) {
     }
 }
 
-
-
 @Composable
-fun WaitScreen(onResetClick: () -> Unit) {
+fun WaitScreen(
+    timeLeft: Long,
+    isRunning: Boolean,
+    onStartPauseClick: (Boolean) -> Unit, // 停止ボタン用のコールバックを追加
+    onResetClick: () -> Unit
+) {
     // コンテキストの取得
     val context = LocalContext.current
+    var time by remember { mutableLongStateOf(timeLeft) } // timeLeftでコピーして使用
 
-    // タイマーの状態管理（初期値: 10秒）
-    var timeLeft by remember { mutableLongStateOf(10L) }
-    var isRunning by remember { mutableStateOf(true) }
-
+    val vibrator = remember {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            context.getSystemService(Vibrator::class.java)
+        } else {
+            @Suppress("DEPRECATION")
+            context.getSystemService(Context.VIBRATOR_SERVICE) as Vibrator?
+        }
+    }
 
     // タイマーの実行
-    LaunchedEffect(isRunning, timeLeft) {
-        if (isRunning && timeLeft > 0) {
-            delay(1000L) // 1秒ごとにカウントダウン
-            timeLeft -= 1
+    LaunchedEffect(isRunning, time) {
+        if (isRunning && time > 0) {
+            delay(1000L)
+            time -= 1 // 1秒ごとにカウントダウン
         }
-        if (timeLeft <= 0 && isRunning) {
-            isRunning = false
+        if (time <= 0 && isRunning) {
             // カウントダウン終了時の通知
             Toast.makeText(context, "待機が終了しました！", Toast.LENGTH_SHORT).show()
+
+            // バイブレーションの実行
+            if (vibrator?.hasVibrator() == true) {
+                try {
+                    val pattern = longArrayOf(0, 500, 200, 500) // 0ms待機，500ms振動，200ms振動，500ms振動
+                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                        vibrator.vibrate(
+                            VibrationEffect.createWaveform(pattern, -1) // 繰り返しなし
+                        )
+                    } else {
+                        @Suppress("DEPRECATION")
+                        vibrator.vibrate(pattern, -1)
+                    }
+                    Log.d("WaitScreen", "バイブレーションを実行しました．")
+                } catch (e: Exception) {
+                    Log.e("WaitScreen", "バイブレーションに失敗しました: ${e.message}")
+                    Toast.makeText(context, "バイブレーションに失敗しました！", Toast.LENGTH_SHORT).show()
+                }
+            } else {
+                Log.e("WaitScreen", "デバイスはバイブレーションにサポートしていません．")
+                Toast.makeText(context, "デバイスはバイブレーションをサポートしていません．", Toast.LENGTH_SHORT).show()
+            }
         }
     }
 
@@ -309,21 +362,31 @@ fun WaitScreen(onResetClick: () -> Unit) {
     ) {
         // 残り時間の表示
         Text(
-            text = "残り時間: ${formatTime(timeLeft)}",
+            text = "残り時間: ${formatTime(time)}",
             style = MaterialTheme.typography.headlineMedium,
-            modifier = Modifier.padding(bottom = 32.dp)
         )
 
-        // リセットボタン
-        Button(
-            onClick = {
-                isRunning = false
-                timeLeft = 10L // 初期値にリセット
-                onResetClick()
-            },
-            modifier = Modifier.width(100.dp)
+        // ボタンコンテナ
+        Row(
+            horizontalArrangement = Arrangement.spacedBy(16.dp)
         ) {
-            Text("Reset")
+            // 開始/停止ボタンの追加
+            Button(
+                onClick = {
+                    onStartPauseClick(isRunning) // 停止ボタンが押されたときにタイマーを停止
+                },
+                modifier = Modifier.width(100.dp)
+            ) {
+                Text(if (isRunning) "Pause" else "Start") // 状態に応じてボタン表示を変更
+            }
+
+            // リセットボタン
+            Button(
+                onClick = onResetClick,
+                modifier = Modifier.width(100.dp)
+            ) {
+                Text("Reset")
+            }
         }
     }
 }
