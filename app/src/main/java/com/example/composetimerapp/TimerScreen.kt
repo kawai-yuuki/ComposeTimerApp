@@ -64,7 +64,6 @@ fun TimerScreen() {
     // シェイク状態を追跡するための状態変数
     var isShaking by remember { mutableStateOf(false) }
     var continuousShakingTime by remember { mutableStateOf(0L) } // 連続シェイク時間（ミリ秒）
-    var shakeJob by remember { mutableStateOf<Job?>(null) }
 
     // シェイクの最後の検出時間を追跡
     var lastShakeTime by remember { mutableStateOf(0L) }
@@ -98,36 +97,39 @@ fun TimerScreen() {
 
     // シェイク状態と連続シェイク時間の管理
     LaunchedEffect(lastShakeTime, isShaking, isVibrationSessionActive) {
+        //運動セッションがアクティブな間、このループを繰り返す
         while (isVibrationSessionActive) {
-            delay(100L) // 0.1秒ごとにチェック
-            val currentTime = System.currentTimeMillis()
-            if (currentTime - lastShakeTime <= 500L) { // シェイクが最近検出された
+            delay(100L) // 0.1秒ごとに現在の時間とシェイク状態をチェック
+            val currentTime = System.currentTimeMillis()// 現在の時間を取得
+            if (currentTime - lastShakeTime <= 500L) { // シェイクが500ms以内に検出された場合
+                //まだシェイク状態がfalseなら、シェイク状態をtrueに更新
                 if (!isShaking) {
                     isShaking = true
-                    continuousShakingTime = 0L
+                    continuousShakingTime = 0L // 連続シェイク時間をリセット
                     // バイブレーションを停止
                     vibrator?.cancel()
                     isVibrating = false
                     Toast.makeText(context, "バイブレーションが停止しました！", Toast.LENGTH_SHORT).show()
                 }
-                continuousShakingTime += 100L
-                if (continuousShakingTime >= 3000L) { // 3秒以上シェイク
-                    // バイブレーションを再開
-                    if (vibrator?.hasVibrator() == true) {
+                continuousShakingTime += 100L// シェイクが継続しているので、シェイク時間を100ms増加
+                if (continuousShakingTime >= 500L) { // 0.5秒以上シェイク
+                    // バイブレーションを再開する処理
+                    if (vibrator?.hasVibrator() == true) {//デバイスがバイブレーションをサポートしているなら
                         try {
+                            //バイブレーションパターンを設定(500ms, 200ms待機を繰り返す)
                             val pattern = longArrayOf(0, 500, 200, 500)
                             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
                                 vibrator.vibrate(
                                     VibrationEffect.createWaveform(
                                         pattern,
                                         0
-                                    )
+                                    )// 0で無限ループ
                                 )
                             } else {
                                 @Suppress("DEPRECATION")
-                                vibrator.vibrate(pattern, 0)
+                                vibrator.vibrate(pattern, 0)//古いバージョンでのバイブレーション再開処理
                             }
-                            isVibrating = true
+                            isVibrating = true// バイブレーション状態を更新
                             Toast.makeText(context, "バイブレーションを再開しました！", Toast.LENGTH_SHORT).show()
                         } catch (e: Exception) {
                             Toast.makeText(context, "バイブレーションに失敗しました！", Toast.LENGTH_SHORT).show()
@@ -136,7 +138,7 @@ fun TimerScreen() {
                     isShaking = false
                     continuousShakingTime = 0L
                 }
-            } else {
+            } else {//シェイクが500ms以内に検出されなかった場合
                 if (isShaking) {
                     isShaking = false
                     continuousShakingTime = 0L
@@ -149,13 +151,13 @@ fun TimerScreen() {
                                     VibrationEffect.createWaveform(
                                         pattern,
                                         0
-                                    )
+                                    )//0で無限ループ
                                 )
                             } else {
                                 @Suppress("DEPRECATION")
-                                vibrator.vibrate(pattern, 0)
+                                vibrator.vibrate(pattern, 0)//古いバージョンでのバイブレーション再開処理
                             }
-                            isVibrating = true
+                            isVibrating = true// バイブレーション状態を更新
                             Toast.makeText(context, "バイブレーションを再開しました！", Toast.LENGTH_SHORT).show()
                         } catch (e: Exception) {
                             Toast.makeText(context, "バイブレーションに失敗しました！", Toast.LENGTH_SHORT).show()
