@@ -309,6 +309,7 @@ fun WaitScreen(
     // コンテキストの取得
     val context = LocalContext.current
     var time by remember { mutableLongStateOf(timeLeft) } // timeLeftでコピーして使用
+    var isCalling by remember { mutableStateOf(false) } // タイマー終了状態を管理
 
     val vibrator = remember {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
@@ -326,6 +327,8 @@ fun WaitScreen(
             time -= 1 // 1秒ごとにカウントダウン
         }
         if (time <= 0 && isRunning) {
+            isCalling = true // タイマーが終了したことを示す
+
             // カウントダウン終了時の通知
             Toast.makeText(context, "待機が終了しました！", Toast.LENGTH_SHORT).show()
 
@@ -353,6 +356,7 @@ fun WaitScreen(
         }
     }
 
+    // UIの構築
     Column(
         modifier = Modifier
             .fillMaxSize()
@@ -360,32 +364,50 @@ fun WaitScreen(
         verticalArrangement = Arrangement.Center,
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
-        // 残り時間の表示
-        Text(
-            text = "残り時間: ${formatTime(time)}",
-            style = MaterialTheme.typography.headlineMedium,
-        )
+        if (!isCalling) {
+            // タイマーが動作中または停止中の通常表示
+            Text(
+                text = "残り時間: ${formatTime(time)}",
+                style = MaterialTheme.typography.headlineMedium,
+            )
 
-        // ボタンコンテナ
-        Row(
-            horizontalArrangement = Arrangement.spacedBy(16.dp)
-        ) {
-            // 開始/停止ボタンの追加
-            Button(
-                onClick = {
-                    onStartPauseClick(isRunning) // 停止ボタンが押されたときにタイマーを停止
-                },
-                modifier = Modifier.width(100.dp)
+            // ボタンコンテナ
+            Row(
+                horizontalArrangement = Arrangement.spacedBy(16.dp)
             ) {
-                Text(if (isRunning) "Pause" else "Start") // 状態に応じてボタン表示を変更
-            }
+                // 開始/停止ボタンの追加
+                Button(
+                    onClick = {
+                        onStartPauseClick(isRunning) // 停止ボタンが押されたときにタイマーを停止
+                    },
+                    modifier = Modifier.width(100.dp)
+                ) {
+                    Text(if (isRunning) "Pause" else "Start") // 状態に応じてボタン表示を変更
+                }
 
-            // リセットボタン
+                // リセットボタン
+                Button(
+                    onClick = onResetClick,
+                    modifier = Modifier.width(100.dp)
+                ) {
+                    Text("Reset")
+                }
+            }
+        } else {
+            // タイマーが終了したときの表示
+            Text(
+                text = "足立さんが着信が来ています",
+                style = MaterialTheme.typography.headlineMedium,
+                fontWeight = FontWeight.Bold,
+                color = MaterialTheme.colorScheme.primary
+            )
+
+            // 終了後の操作ボタン
             Button(
                 onClick = onResetClick,
-                modifier = Modifier.width(100.dp)
+                modifier = Modifier.padding(top = 16.dp)
             ) {
-                Text("Reset")
+                Text("Reset Timer")
             }
         }
     }
