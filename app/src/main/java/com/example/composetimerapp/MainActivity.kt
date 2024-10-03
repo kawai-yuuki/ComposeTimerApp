@@ -1,11 +1,19 @@
 package com.example.composetimerapp
 
 import android.annotation.SuppressLint
+import android.app.Notification
+import android.app.NotificationChannel
+import android.app.NotificationManager
+import android.app.Service
 import android.content.Context
+import android.content.Context.VIBRATOR_SERVICE
+import android.content.Intent
 import android.os.Build
 import android.os.Bundle
+import android.os.IBinder
 import android.os.VibrationEffect
 import android.os.Vibrator
+import android.os.VibratorManager
 import android.util.Log
 import android.widget.Toast
 import androidx.activity.ComponentActivity
@@ -19,6 +27,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.core.app.NotificationCompat
 import androidx.navigation.compose.*
 import com.example.composetimerapp.ui.theme.ComposeTimerAppTheme
 import kotlinx.coroutines.delay
@@ -44,6 +53,66 @@ class MainActivity : ComponentActivity() {
                 }
             }
         }
+    }
+}
+
+// ForegroundService クラスの実装
+class TimerForegroundService : Service() {
+    private lateinit var vibrator: Vibrator
+
+    override fun onCreate() {
+        super.onCreate()
+        vibrator = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+            val vibratorManager = getSystemService(Context.VIBRATOR_MANAGER_SERVICE) as VibratorManager
+            vibratorManager.defaultVibrator
+        } else {
+            @Suppress("DEPRECATION")
+            getSystemService(VIBRATOR_SERVICE) as Vibrator
+        }
+    }
+
+    override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
+        val notification = createNotification()
+        startForeground(1, notification)
+
+        // バイブレーションを開始
+        startVibration()
+
+        return START_NOT_STICKY
+    }
+
+    private fun createNotification(): Notification {
+        val notificationChannelId = "TIMER_CHANNEL_ID"
+
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            val channel = NotificationChannel(
+                notificationChannelId,
+                "Timer Notification",
+                NotificationManager.IMPORTANCE_DEFAULT
+            )
+            val manager = getSystemService(NotificationManager::class.java)
+            manager.createNotificationChannel(channel)
+        }
+
+        return NotificationCompat.Builder(this, notificationChannelId)
+            .setContentTitle("Timer Running")
+            .setContentText("Your timer is running.")
+            .setSmallIcon(R.drawable.ic_timer)
+            .build()
+    }
+
+    private fun startVibration() {
+        val pattern = longArrayOf(0, 500, 200, 500) // 0ms待機、500ms振動、200ms待機、500ms振動
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            vibrator.vibrate(VibrationEffect.createWaveform(pattern, -1)) // 1回だけ
+        } else {
+            @Suppress("DEPRECATION")
+            vibrator.vibrate(pattern, -1)
+        }
+    }
+
+    override fun onBind(intent: Intent?): IBinder? {
+        return null
     }
 }
 
@@ -126,13 +195,12 @@ fun TimerScreen(
 ) {
     // コンテキストの取得
     val context = LocalContext.current
-    val vibrator = remember {
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-            context.getSystemService(Vibrator::class.java)
-        } else {
-            @Suppress("DEPRECATION")
-            context.getSystemService(Context.VIBRATOR_SERVICE) as Vibrator?
-        }
+    val vibrator = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+        val vibratorManager = context.getSystemService(Context.VIBRATOR_MANAGER_SERVICE) as VibratorManager
+        vibratorManager.defaultVibrator
+    } else {
+        @Suppress("DEPRECATION")
+        context.getSystemService(VIBRATOR_SERVICE) as Vibrator
     }
 
     // スクロールによる時間設定用の状態
@@ -151,7 +219,7 @@ fun TimerScreen(
             Toast.makeText(context, "タイマーが終了しました！", Toast.LENGTH_SHORT).show()
 
             // バイブレーションの実行
-            if (vibrator?.hasVibrator() == true) {
+            if (vibrator.hasVibrator()) {
                 try {
                     // バイブレーションパターンの定義
                     val pattern = longArrayOf(0, 500, 200, 500) // 0ms待機、500ms振動、200ms待機、500ms振動
@@ -235,7 +303,13 @@ fun TimerScreen(
                 onClick = {
                     if (!isRunning) {
                         // スクロールで選択された時間をタイマーに設定
-                        val totalSeconds = (selectedMinutes.toInt() * 60 + selectedSeconds.toInt()).toLong()
+                        val totalSeconds = (selectedMinutes.toInt()*60+selectedSeconds.toInt()).toLong()
+                        val serviceIntent = Intent(context, TimerForegroundService::class.java)
+                        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                            context.startForegroundService(serviceIntent)
+                        } else {
+                            context.startService(serviceIntent)
+                        }
                         if (totalSeconds > 0) {
                             onTimeSet(totalSeconds)
                             onStartClick()
@@ -266,7 +340,7 @@ fun TimerScreen(
         Spacer(modifier = Modifier.height(16.dp))
         Button(
             onClick = {
-                if (vibrator?.hasVibrator() == true) {
+                if (vibrator.hasVibrator()) {
                     try {
                         // バイブレーションパターンの定義
                         val pattern = longArrayOf(0, 500, 200, 500) // 0ms待機、500ms振動、200ms待機、500ms振動
@@ -316,7 +390,7 @@ fun WaitScreen(
             context.getSystemService(Vibrator::class.java)
         } else {
             @Suppress("DEPRECATION")
-            context.getSystemService(Context.VIBRATOR_SERVICE) as Vibrator?
+            context.getSystemService(VIBRATOR_SERVICE) as Vibrator?
         }
     }
 
@@ -401,7 +475,7 @@ fun WaitScreen(
         } else {
             // タイマーが終了したときの表示
             Text(
-                text = "足立さんが着信が来ています",
+                text = "足立さんから着信が来ています",
                 style = MaterialTheme.typography.headlineMedium,
                 fontWeight = FontWeight.Bold,
                 color = MaterialTheme.colorScheme.primary
