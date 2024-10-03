@@ -338,7 +338,7 @@ fun WaitScreen(
                     val pattern = longArrayOf(0, 500, 200, 500) // 0ms待機，500ms振動，200ms振動，500ms振動
                     if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
                         vibrator.vibrate(
-                            VibrationEffect.createWaveform(pattern, -1) // 繰り返しなし
+                            VibrationEffect.createWaveform(pattern, 0) // 無限ループ
                         )
                     } else {
                         @Suppress("DEPRECATION")
@@ -387,7 +387,12 @@ fun WaitScreen(
 
                 // リセットボタン
                 Button(
-                    onClick = onResetClick,
+                    onClick = {
+                        onResetClick()
+                        vibrator?.cancel() // バイブレーションを停止
+                        isCalling = false // 通話状態のリセット
+                        time = timeLeft // タイマーのリセット
+                    },
                     modifier = Modifier.width(100.dp)
                 ) {
                     Text("Reset")
@@ -404,7 +409,12 @@ fun WaitScreen(
 
             // 終了後の操作ボタン
             Button(
-                onClick = onResetClick,
+                onClick = {
+                    onResetClick()
+                    vibrator?.cancel()
+                    isCalling = false
+                    time  = timeLeft
+                },
                 modifier = Modifier.padding(top = 16.dp)
             ) {
                 Text("Reset Timer")
