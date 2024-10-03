@@ -489,8 +489,8 @@ fun WaitScreen(
                 contentDescription = "Timer Finished",
                 modifier = Modifier
                     .size(200.dp)
-                    .fillMaxWidth(),
-                contentScale = ContentScale.Fit
+                    .fillMaxWidth(),// 横幅いっぱいに拡張
+                contentScale = ContentScale.Fit // 画像が見切れないように収める
             )
             Text(
                 text = "足立さんから着信が来ています",
