@@ -2,6 +2,10 @@ package com.example.composetimerapp
 
 import android.annotation.SuppressLint
 import android.content.Context
+import android.hardware.Sensor
+import android.hardware.SensorEvent
+import android.hardware.SensorEventListener
+import android.hardware.SensorManager
 import android.os.Build
 import android.os.Bundle
 import android.os.VibrationEffect
@@ -22,6 +26,7 @@ import androidx.compose.ui.unit.sp
 import androidx.navigation.compose.*
 import com.example.composetimerapp.ui.theme.ComposeTimerAppTheme
 import kotlinx.coroutines.delay
+import kotlin.math.sqrt
 
 // 時間を分:秒形式にフォーマットする関数（トップレベルに定義）
 @SuppressLint("DefaultLocale")
@@ -124,7 +129,6 @@ fun TimerScreen(
     onStartClick: () -> Unit,
     onPauseClick: () -> Unit
 ) {
-    // コンテキストの取得
     val context = LocalContext.current
     val vibrator = remember {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
@@ -135,50 +139,71 @@ fun TimerScreen(
         }
     }
 
-    // スクロールによる時間設定用の状態
-    var selectedMinutes by remember { mutableFloatStateOf(1f) } // 初期値: 1分
-    var selectedSeconds by remember { mutableFloatStateOf(0f) } // 初期値: 0秒
+    // スライダーによる時間設定用の状態
+    var selectedMinutes by remember { mutableFloatStateOf(1f) } // 初期値:1分
+    var selectedSeconds by remember { mutableFloatStateOf(0f) } // 初期値:0分
 
-    // タイマーの実行
+    /////////////////////////////////////////////
+    //20241003追加 by komoda
+    // 運動セッションの時間設定（秒単位）
+    var exerciseDurationSeconds by remember { mutableLongStateOf(60L) }
+
+    // SensorManager の取得
+    val sensorManager = context.getSystemService(Context.SENSOR_SERVICE) as SensorManager
+    // バイブレーション実行中かどうかのフラグ
+    var isVibrating by remember { mutableStateOf(false) }
+    //フラグはこういうisから始めるのが慣例？
+    var isShaking by remember { mutableStateOf(false) }
+
+    // シェイクの振り始めの検出時間を管理
+    var firstShakeTime by remember { mutableStateOf(0L) }
+    // シェイクの最後の検出時間を追跡
+    var lastShakeTime by remember { mutableStateOf(0L) }
+    // 振っていない時間
+    var notShakingTime by remember { mutableStateOf(0L) }
+
+    // 運動セッションの状態管理
+    var isVibrationSessionActive by remember { mutableStateOf(false) }// タイマーの実行にてtrueにする
+    var vibrationSessionTimeLeft by remember { mutableStateOf(60L) } // 初期値: 60秒
+
+    // ShakeDetector の呼び出し
+    val sensorEventListener = shakeDetector {
+        if (firstShakeTime == 0L) {
+            firstShakeTime = System.currentTimeMillis()
+            isShaking = true
+        }
+    }
+
+    // センサーリスナーの登録と解除
+    DisposableEffect(sensorManager) {
+        val accelerometer = sensorManager.getDefaultSensor(Sensor.TYPE_ACCELEROMETER)
+        sensorManager.registerListener(sensorEventListener, accelerometer, SensorManager.SENSOR_DELAY_UI)
+
+        onDispose {
+            sensorManager.unregisterListener(sensorEventListener)
+        }
+    }
+    /////////////////////////////////////////////
+
     LaunchedEffect(isRunning, timeLeft) {
         if (isRunning && timeLeft > 0) {
-            //onStartClick()
             delay(1000L)
             onTimeSet(timeLeft - 1)
         }
         if (timeLeft <= 0 && isRunning) {
-            // タイマー終了の通知
             Toast.makeText(context, "タイマーが終了しました！", Toast.LENGTH_SHORT).show()
-
-            // バイブレーションの実行
             if (vibrator?.hasVibrator() == true) {
-                try {
-                    // バイブレーションパターンの定義
-                    val pattern = longArrayOf(0, 500, 200, 500) // 0ms待機、500ms振動、200ms待機、500ms振動
-                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-                        vibrator.vibrate(
-                            VibrationEffect.createWaveform(
-                                pattern,
-                                -1 // 繰り返しなし
-                            )
-                        )
-                    } else {
-                        @Suppress("DEPRECATION")
-                        vibrator.vibrate(pattern, -1)
-                    }
-                    Log.d("TimerScreen", "バイブレーションを実行しました。")
-                } catch (e: Exception) {
-                    Log.e("TimerScreen", "バイブレーションに失敗しました: ${e.message}")
-                    Toast.makeText(context, "バイブレーションに失敗しました！", Toast.LENGTH_SHORT).show()
+                val pattern = longArrayOf(0, 500, 200, 500)
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                    vibrator.vibrate(VibrationEffect.createWaveform(pattern, -1))
+                } else {
+                    @Suppress("DEPRECATION")
+                    vibrator.vibrate(pattern, -1)
                 }
-            } else {
-                Log.e("TimerScreen", "デバイスはバイブレーションをサポートしていません。")
-                Toast.makeText(context, "デバイスはバイブレーションをサポートしていません。", Toast.LENGTH_SHORT).show()
             }
         }
     }
 
-    // UIの構築
     Column(
         modifier = Modifier
             .fillMaxSize()
@@ -186,55 +211,51 @@ fun TimerScreen(
         verticalArrangement = Arrangement.Center,
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
-        // 分の選択
-        Text(
-            text = "Minutes: ${selectedMinutes.toInt()}",
-            fontSize = 18.sp,
-            modifier = Modifier.padding(bottom = 8.dp)
-        )
+        Text(text = "Minutes: ${selectedMinutes.toInt()}", fontSize = 18.sp)
         Slider(
             value = selectedMinutes,
             onValueChange = { selectedMinutes = it },
             valueRange = 0f..60f,
-            steps = 59, // 0から60までの整数を選択可能にする
+            steps = 59,
             modifier = Modifier.padding(horizontal = 16.dp)
         )
 
         Spacer(modifier = Modifier.height(24.dp))
 
-        // 秒の選択
-        Text(
-            text = "Seconds: ${selectedSeconds.toInt()}",
-            fontSize = 18.sp,
-            modifier = Modifier.padding(bottom = 8.dp)
-        )
+        Text(text = "Seconds: ${selectedSeconds.toInt()}", fontSize = 18.sp)
         Slider(
             value = selectedSeconds,
             onValueChange = { selectedSeconds = it },
             valueRange = 0f..59f,
-            steps = 58, // 0から59までの整数を選択可能にする
+            steps = 58,
             modifier = Modifier.padding(horizontal = 16.dp)
         )
 
         Spacer(modifier = Modifier.height(32.dp))
 
-        // タイマー表示
-        Text(
-            text = formatTime(timeLeft),
-            fontSize = 48.sp,
-            fontWeight = FontWeight.Bold,
-            modifier = Modifier.padding(bottom = 32.dp)
+        Text(text = "Exercise Duration: ${exerciseDurationSeconds}s", fontSize = 18.sp)
+        Slider(
+            value = exerciseDurationSeconds.toFloat(),
+            onValueChange = { exerciseDurationSeconds = it.toLong() },
+            valueRange = 10f..120f,
+            steps = 110,
+            modifier = Modifier.padding(horizontal = 16.dp)
         )
 
-        // ボタンコンテナ
-        Row(
-            horizontalArrangement = Arrangement.spacedBy(16.dp)
-        ) {
-            // スタート/ポーズボタン
+        Spacer(modifier = Modifier.height(32.dp))
+
+        Text(text = formatTime(timeLeft), fontSize = 48.sp, fontWeight = FontWeight.Bold)
+
+        Text(
+            text = if (isShaking) "Shaking" else "No Shaking",
+            fontSize = 24.sp,
+            color = if (isShaking) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onBackground
+        )
+
+        Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
             Button(
                 onClick = {
                     if (!isRunning) {
-                        // スクロールで選択された時間をタイマーに設定
                         val totalSeconds = (selectedMinutes.toInt() * 60 + selectedSeconds.toInt()).toLong()
                         if (totalSeconds > 0) {
                             onTimeSet(totalSeconds)
@@ -249,12 +270,11 @@ fun TimerScreen(
                 Text(if (isRunning) "Pause" else "Start")
             }
 
-            // リセットボタン
             Button(
                 onClick = {
-                    onTimeSet(60L) // 初期値にリセット
-                    selectedMinutes = 1f // 初期値にリセット（例: 1分）
-                    selectedSeconds = 0f // 初期値にリセット
+                    onTimeSet(60L)
+                    selectedMinutes = 1f
+                    selectedSeconds = 0f
                 },
                 modifier = Modifier.width(100.dp)
             ) {
@@ -262,34 +282,19 @@ fun TimerScreen(
             }
         }
 
-        // テスト用バイブレーションボタンの追加
         Spacer(modifier = Modifier.height(16.dp))
+
         Button(
             onClick = {
                 if (vibrator?.hasVibrator() == true) {
-                    try {
-                        // バイブレーションパターンの定義
-                        val pattern = longArrayOf(0, 500, 200, 500) // 0ms待機、500ms振動、200ms待機、500ms振動
-                        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-                            vibrator.vibrate(
-                                VibrationEffect.createWaveform(
-                                    pattern,
-                                    -1 // 繰り返しなし
-                                )
-                            )
-                        } else {
-                            @Suppress("DEPRECATION")
-                            vibrator.vibrate(pattern, -1)
-                        }
-                        Toast.makeText(context, "バイブレーションを実行しました！", Toast.LENGTH_SHORT).show()
-                        Log.d("TimerScreen", "テストバイブレーションを実行しました。")
-                    } catch (e: Exception) {
-                        Log.e("TimerScreen", "テストバイブレーションに失敗しました: ${e.message}")
-                        Toast.makeText(context, "バイブレーションに失敗しました！", Toast.LENGTH_SHORT).show()
+                    val pattern = longArrayOf(0, 500, 200, 500)
+                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                        vibrator.vibrate(VibrationEffect.createWaveform(pattern, -1))
+                    } else {
+                        @Suppress("DEPRECATION")
+                        vibrator.vibrate(pattern, -1)
                     }
-                } else {
-                    Log.e("TimerScreen", "デバイスはバイブレーションをサポートしていません。")
-                    Toast.makeText(context, "デバイスはバイブレーションをサポートしていません。", Toast.LENGTH_SHORT).show()
+                    Toast.makeText(context, "バイブレーションを実行しました！", Toast.LENGTH_SHORT).show()
                 }
             },
             modifier = Modifier.width(200.dp)
@@ -298,7 +303,6 @@ fun TimerScreen(
         }
     }
 }
-
 @Composable
 fun WaitScreen(
     timeLeft: Long,
@@ -422,3 +426,42 @@ fun WaitScreen(
         }
     }
 }
+
+/////////////////////////////////////////
+// 20241003追加by komoda
+@Composable
+fun shakeDetector(
+    onShake: () -> Unit
+): SensorEventListener {
+    val SHAKE_THRESHOLD_GRAVITY = 1f
+    val SHAKE_SLOP_TIME_MS = 500
+    var shakeTimestamp by remember { mutableStateOf(0L) }
+
+    return object : SensorEventListener {
+        override fun onSensorChanged(event: SensorEvent?) {
+            event?.let {
+                val x = it.values[0]
+                val y = it.values[1]
+                val z = it.values[2]
+
+                val gX = x / SensorManager.GRAVITY_EARTH
+                val gY = y / SensorManager.GRAVITY_EARTH
+                val gZ = z / SensorManager.GRAVITY_EARTH
+
+                val gForce = sqrt(gX * gX + gY * gY + gZ * gZ)
+
+                if (gForce > SHAKE_THRESHOLD_GRAVITY) {
+                    val now = System.currentTimeMillis()
+                    if (shakeTimestamp + SHAKE_SLOP_TIME_MS > now) {
+                        return
+                    }
+                    shakeTimestamp = now
+                    onShake()
+                }
+            }
+        }
+
+        override fun onAccuracyChanged(sensor: Sensor?, accuracy: Int) {}
+    }
+}
+/////////////////////////////////////////
