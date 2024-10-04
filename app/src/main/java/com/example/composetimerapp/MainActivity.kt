@@ -1,5 +1,6 @@
 package com.example.composetimerapp
 
+import android.media.MediaPlayer
 import androidx.compose.foundation.Image
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.layout.ContentScale
@@ -27,6 +28,7 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.semantics.Role.Companion.Image
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -62,6 +64,7 @@ class MainActivity : ComponentActivity() {
 // ForegroundService クラスの実装
 class TimerForegroundService : Service() {
     private lateinit var vibrator: Vibrator
+    private var mediaPlayer: MediaPlayer? = null // MediaPlayer のインスタンスを追加
 
     override fun onCreate() {
         super.onCreate()
@@ -78,6 +81,11 @@ class TimerForegroundService : Service() {
         val notification = createNotification()
         startForeground(1, notification)
 
+        /*
+        // バイブレーションを開始
+        startVibrationAndSound()
+        */
+
         return START_NOT_STICKY
     }
 
@@ -88,7 +96,7 @@ class TimerForegroundService : Service() {
             val channel = NotificationChannel(
                 notificationChannelId,
                 "Timer Notification",
-                NotificationManager.IMPORTANCE_LOW
+                NotificationManager.IMPORTANCE_DEFAULT
             )
             val manager = getSystemService(NotificationManager::class.java)
             manager.createNotificationChannel(channel)
@@ -385,6 +393,10 @@ fun WaitScreen(
         }
     }
 
+    // MediaPlayerのインスタンスを作成
+    val mediaPlayer = remember { MediaPlayer.create(context, R.raw.ringtone) } // ringtone.mp3 を res/raw に置いたと仮定
+    mediaPlayer.isLooping = true // 音楽を繰り返し再生する設定
+
     // タイマーの実行
     LaunchedEffect(isRunning, time) {
         if (isRunning && time > 0) {
@@ -417,6 +429,14 @@ fun WaitScreen(
             } else {
                 Log.e("WaitScreen", "デバイスはバイブレーションにサポートしていません．")
                 Toast.makeText(context, "デバイスはバイブレーションをサポートしていません．", Toast.LENGTH_SHORT).show()
+            }
+
+            // タイマー終了時に音を再生
+            try {
+                mediaPlayer.start() // 音を再生
+                Log.d("TimerScreen", "音を再生しました。")
+            } catch (e: Exception) {
+                Log.e("TimerScreen", "音の再生に失敗しました: ${e.message}")
             }
         }
     }
@@ -491,6 +511,8 @@ fun WaitScreen(
                 onClick = {
                     onResetClick()
                     vibrator?.cancel()
+                    mediaPlayer.stop() // 音楽の停止
+                    mediaPlayer.prepare() // 再度再生できるように準備
                     isCalling = false
                     time  = timeLeft
                 },
