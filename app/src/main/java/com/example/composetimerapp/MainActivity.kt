@@ -27,7 +27,6 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.semantics.Role.Companion.Image
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -79,9 +78,6 @@ class TimerForegroundService : Service() {
         val notification = createNotification()
         startForeground(1, notification)
 
-        // バイブレーションを開始
-        //startVibration()
-
         return START_NOT_STICKY
     }
 
@@ -105,17 +101,6 @@ class TimerForegroundService : Service() {
             .setPriority(NotificationCompat.PRIORITY_LOW)
             .build()
     }
-    /**
-    private fun startVibration() {
-        val pattern = longArrayOf(0, 500, 200, 500) // 0ms待機、500ms振動、200ms待機、500ms振動
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            vibrator.vibrate(VibrationEffect.createWaveform(pattern, -1)) // 1回だけ
-        } else {
-            @Suppress("DEPRECATION")
-            vibrator.vibrate(pattern, -1)
-        }
-    }
-    **/
 
     override fun onBind(intent: Intent?): IBinder? {
         return null
