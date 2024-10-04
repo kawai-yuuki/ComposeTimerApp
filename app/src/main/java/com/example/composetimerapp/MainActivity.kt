@@ -1,5 +1,8 @@
 package com.example.composetimerapp
 
+import androidx.compose.foundation.Image
+import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.layout.ContentScale
 import android.annotation.SuppressLint
 import android.app.Notification
 import android.app.NotificationChannel
@@ -24,6 +27,7 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.semantics.Role.Companion.Image
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -440,6 +444,12 @@ fun WaitScreen(
     ) {
         if (!isCalling) {
             // タイマーが動作中または停止中の通常表示
+            Image(
+                painter = painterResource(id = R.drawable.timer_running_image),
+                contentDescription = "Timer Running",
+                modifier = Modifier.size(200.dp),
+                contentScale = ContentScale.Crop
+            )
             Text(
                 text = "残り時間: ${formatTime(time)}",
                 style = MaterialTheme.typography.headlineMedium,
@@ -474,6 +484,14 @@ fun WaitScreen(
             }
         } else {
             // タイマーが終了したときの表示
+            Image(
+                painter = painterResource(id = R.drawable.timer_finished_image),
+                contentDescription = "Timer Finished",
+                modifier = Modifier
+                    .size(200.dp)
+                    .fillMaxWidth(),// 横幅いっぱいに拡張
+                contentScale = ContentScale.Fit // 画像が見切れないように収める
+            )
             Text(
                 text = "足立さんから着信が来ています",
                 style = MaterialTheme.typography.headlineMedium,
