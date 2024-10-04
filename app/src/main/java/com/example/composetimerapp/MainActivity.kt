@@ -80,7 +80,7 @@ class TimerForegroundService : Service() {
         startForeground(1, notification)
 
         // バイブレーションを開始
-        startVibration()
+        //startVibration()
 
         return START_NOT_STICKY
     }
@@ -92,7 +92,7 @@ class TimerForegroundService : Service() {
             val channel = NotificationChannel(
                 notificationChannelId,
                 "Timer Notification",
-                NotificationManager.IMPORTANCE_DEFAULT
+                NotificationManager.IMPORTANCE_LOW
             )
             val manager = getSystemService(NotificationManager::class.java)
             manager.createNotificationChannel(channel)
@@ -102,9 +102,10 @@ class TimerForegroundService : Service() {
             .setContentTitle("Timer Running")
             .setContentText("Your timer is running.")
             .setSmallIcon(R.drawable.ic_timer)
+            .setPriority(NotificationCompat.PRIORITY_LOW)
             .build()
     }
-
+    /**
     private fun startVibration() {
         val pattern = longArrayOf(0, 500, 200, 500) // 0ms待機、500ms振動、200ms待機、500ms振動
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
@@ -114,6 +115,7 @@ class TimerForegroundService : Service() {
             vibrator.vibrate(pattern, -1)
         }
     }
+    **/
 
     override fun onBind(intent: Intent?): IBinder? {
         return null
