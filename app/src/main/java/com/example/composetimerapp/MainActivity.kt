@@ -179,8 +179,16 @@ fun StartScreen(onStartTransition: () -> Unit) {
         verticalArrangement = Arrangement.Center,
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
+        Image(
+            painter = painterResource(id = R.drawable.title_image),
+            contentDescription = "Title",
+            modifier = Modifier
+                .size(200.dp)
+                .fillMaxWidth(),// 横幅いっぱいに拡張
+            contentScale = ContentScale.Fit // 画像が見切れないように収める
+        )
         Text(
-            text = "Welcome to Timer App",
+            text = "足立さん",
             style = MaterialTheme.typography.headlineMedium,
             modifier = Modifier.padding(bottom = 32.dp)
         )
