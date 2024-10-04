@@ -1,5 +1,6 @@
 package com.example.composetimerapp
 
+import android.media.MediaPlayer
 import androidx.compose.foundation.Image
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.layout.ContentScale
@@ -62,6 +63,7 @@ class MainActivity : ComponentActivity() {
 // ForegroundService クラスの実装
 class TimerForegroundService : Service() {
     private lateinit var vibrator: Vibrator
+    //private var mediaPlayer: MediaPlayer? = null // MediaPlayer のインスタンスを追加
 
     override fun onCreate() {
         super.onCreate()
@@ -389,6 +391,10 @@ fun WaitScreen(
         }
     }
 
+    // MediaPlayerのインスタンスを作成
+    val mediaPlayer = remember { MediaPlayer.create(context, R.raw.ringtone) } // ringtone.mp3 を res/raw に置いたと仮定
+    mediaPlayer.isLooping = true // 音楽を繰り返し再生する設定
+
     // タイマーの実行
     LaunchedEffect(isRunning, time) {
         if (isRunning && time > 0) {
@@ -423,6 +429,11 @@ fun WaitScreen(
                 Toast.makeText(context, "デバイスはバイブレーションをサポートしていません．", Toast.LENGTH_SHORT).show()
             }
 
+            //タイマー終了時に音を再生
+            if (!mediaPlayer.isPlaying) {
+                mediaPlayer.start()
+            }
+
             // 5秒間待機
             delay(5000L)
             vibrator?.cancel()
@@ -431,6 +442,12 @@ fun WaitScreen(
             time = timeLeft // もとの時間で再スタート
             isCalling = false
             onStartClick() // タイマーを再起動
+        }
+
+        // isCallingがfalseになったら音を停止
+        if (!isCalling && mediaPlayer.isPlaying) {
+            mediaPlayer.stop()
+            mediaPlayer.prepare() // 次回の再生のために準備
         }
     }
 
@@ -504,6 +521,8 @@ fun WaitScreen(
                 onClick = {
                     onResetClick()
                     vibrator?.cancel()
+                    mediaPlayer.stop() // 音楽の停止
+                    mediaPlayer.prepare() // 再度再生できるように準備
                     isCalling = false
                     time  = timeLeft
                 },
