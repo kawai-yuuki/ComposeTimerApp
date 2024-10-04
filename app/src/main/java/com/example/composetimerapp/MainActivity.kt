@@ -142,6 +142,9 @@ fun AppNavigation() {
                 onStartPauseClick = {
                     currentIsRunning -> isRunning = !currentIsRunning // タイマーの開始と停止
                 },
+                onStartClick = {
+                    isRunning = true
+                },
                 onResetClick = {
                     isRunning = false
                     timeLeft = 60L // タイマーをリセット
@@ -369,6 +372,7 @@ fun WaitScreen(
     timeLeft: Long,
     isRunning: Boolean,
     onStartPauseClick: (Boolean) -> Unit, // 停止ボタン用のコールバックを追加
+    onStartClick: () -> Unit, // タイマーの再起動用コールバック
     onResetClick: () -> Unit
 ) {
     // コンテキストの取得
@@ -418,6 +422,15 @@ fun WaitScreen(
                 Log.e("WaitScreen", "デバイスはバイブレーションにサポートしていません．")
                 Toast.makeText(context, "デバイスはバイブレーションをサポートしていません．", Toast.LENGTH_SHORT).show()
             }
+
+            // 5秒間待機
+            delay(5000L)
+            vibrator?.cancel()
+
+            // タイマーを再起動
+            time = timeLeft // もとの時間で再スタート
+            isCalling = false
+            onStartClick() // タイマーを再起動
         }
     }
 
