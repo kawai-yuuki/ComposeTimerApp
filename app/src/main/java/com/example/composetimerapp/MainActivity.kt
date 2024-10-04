@@ -22,11 +22,19 @@ import android.util.Log
 import android.widget.Toast
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
+import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.snapping.rememberSnapFlingBehavior
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.itemsIndexed
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -63,7 +71,6 @@ class MainActivity : ComponentActivity() {
 // ForegroundService クラスの実装
 class TimerForegroundService : Service() {
     private lateinit var vibrator: Vibrator
-    //private var mediaPlayer: MediaPlayer? = null // MediaPlayer のインスタンスを追加
 
     override fun onCreate() {
         super.onCreate()
@@ -199,9 +206,14 @@ fun TimerScreen(
         context.getSystemService(VIBRATOR_SERVICE) as Vibrator
     }
 
-    // スクロールによる時間設定用の状態
-    var selectedMinutes by remember { mutableFloatStateOf(1f) } // 初期値: 1分
-    var selectedSeconds by remember { mutableFloatStateOf(0f) } // 初期値: 0秒
+    // タイマー設定用の状態
+    var selectedHours by remember { mutableStateOf(0) } // 初期値: 0時間
+    var selectedMinutes by remember { mutableStateOf(0) } // 初期値: 0分
+    var selectedSeconds by remember { mutableStateOf(0) } // 初期値: 0秒
+
+    // タイマーの時間を計算
+    val totalSelectedTime = (selectedHours * 3600 + selectedMinutes * 60 + selectedSeconds).toLong()
+
 
     // タイマーの実行
     LaunchedEffect(isRunning, timeLeft) {
@@ -250,41 +262,44 @@ fun TimerScreen(
         verticalArrangement = Arrangement.Center,
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
-        // 分の選択
-        Text(
-            text = "Minutes: ${selectedMinutes.toInt()}",
-            fontSize = 18.sp,
-            modifier = Modifier.padding(bottom = 8.dp)
-        )
-        Slider(
-            value = selectedMinutes,
-            onValueChange = { selectedMinutes = it },
-            valueRange = 0f..60f,
-            steps = 59, // 0から60までの整数を選択可能にする
-            modifier = Modifier.padding(horizontal = 16.dp)
-        )
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.Center
+        ) {
+            // 時間のピッカー
+            Picker(
+                label = "時間",
+                value = selectedHours,
+                range = 0..99,
+                onValueChange = { selectedHours = it }
+            )
 
-        Spacer(modifier = Modifier.height(24.dp))
+            Spacer(modifier = Modifier.width(16.dp))
 
-        // 秒の選択
-        Text(
-            text = "Seconds: ${selectedSeconds.toInt()}",
-            fontSize = 18.sp,
-            modifier = Modifier.padding(bottom = 8.dp)
-        )
-        Slider(
-            value = selectedSeconds,
-            onValueChange = { selectedSeconds = it },
-            valueRange = 0f..59f,
-            steps = 58, // 0から59までの整数を選択可能にする
-            modifier = Modifier.padding(horizontal = 16.dp)
-        )
+            // 分のピッカー
+            Picker(
+                label = "分",
+                value = selectedMinutes,
+                range = 0..59,
+                onValueChange = { selectedMinutes = it }
+            )
+
+            Spacer(modifier = Modifier.width(16.dp))
+
+            // 秒のピッカー
+            Picker(
+                label = "秒",
+                value = selectedSeconds,
+                range = 0..59,
+                onValueChange = { selectedSeconds = it }
+            )
+        }
 
         Spacer(modifier = Modifier.height(32.dp))
 
         // タイマー表示
         Text(
-            text = formatTime(timeLeft),
+            text = formatTime(if (isRunning) timeLeft else totalSelectedTime),
             fontSize = 48.sp,
             fontWeight = FontWeight.Bold,
             modifier = Modifier.padding(bottom = 32.dp)
@@ -295,43 +310,40 @@ fun TimerScreen(
             horizontalArrangement = Arrangement.spacedBy(16.dp)
         ) {
             // スタート/ポーズボタン
-            Button(
-                onClick = {
-                    if (!isRunning) {
-                        // スクロールで選択された時間をタイマーに設定
-                        val totalSeconds = (selectedMinutes.toInt()*60+selectedSeconds.toInt()).toLong()
-                        val serviceIntent = Intent(context, TimerForegroundService::class.java)
-                        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-                            context.startForegroundService(serviceIntent)
+            Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
+                Button(
+                    onClick = {
+                        if (!isRunning) {
+                            val totalSeconds = (selectedHours * 3600 + selectedMinutes * 60 + selectedSeconds).toLong()
+                            if (totalSeconds > 0) {
+                                onTimeSet(totalSeconds)
+                                onStartClick()
+                            }
                         } else {
-                            context.startService(serviceIntent)
+                            onPauseClick()
                         }
-                        if (totalSeconds > 0) {
-                            onTimeSet(totalSeconds)
-                            onStartClick()
-                        }
-                    } else {
-                        onPauseClick()
-                    }
-                },
-                modifier = Modifier.width(100.dp)
-            ) {
-                Text(if (isRunning) "Pause" else "Start")
-            }
+                    },
+                    modifier = Modifier.width(100.dp)
+                ) {
+                    Text(if (isRunning) "一時停止" else "開始")
+                }
 
-            // リセットボタン
-            Button(
-                onClick = {
-                    onTimeSet(60L) // 初期値にリセット
-                    selectedMinutes = 1f // 初期値にリセット（例: 1分）
-                    selectedSeconds = 0f // 初期値にリセット
-                },
-                modifier = Modifier.width(100.dp)
-            ) {
-                Text("Reset")
+                // リセットボタン
+                Button(
+                    onClick = {
+                        onTimeSet(60L) // 初期値にリセット
+                        selectedHours = 0 // 0時間にリセット
+                        selectedMinutes = 0 // 0分にリセット
+                        selectedSeconds = 0 // 0秒にリセット
+                    },
+                    modifier = Modifier.width(100.dp)
+                ) {
+                    Text("リセット")
+                }
             }
         }
 
+        /*
         // テスト用バイブレーションボタンの追加
         Spacer(modifier = Modifier.height(16.dp))
         Button(
@@ -365,6 +377,60 @@ fun TimerScreen(
             modifier = Modifier.width(200.dp)
         ) {
             Text("Test Vibration")
+        }
+        */
+    }
+}
+
+@Composable
+fun Picker(label: String, value: Int, range: IntRange, onValueChange: (Int) -> Unit) {
+    // 現在の値の位置に基づいてピッカーを初期化する LazyListState を作成
+    val listState = rememberLazyListState(initialFirstVisibleItemIndex = value)
+
+    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+        Text(text = label, fontSize = 18.sp, modifier = Modifier.padding(bottom = 8.dp))
+
+        Box(
+            modifier = Modifier
+                .height(130.dp) // 少し高さを持たせて中央を強調
+                .width(60.dp)
+                .background(Color.LightGray) // 背景色で視認性を向上
+        ) {
+            LazyColumn(
+                state = listState,
+                modifier = Modifier.fillMaxSize(),
+                horizontalAlignment = Alignment.CenterHorizontally,
+                flingBehavior = rememberSnapFlingBehavior(listState) // スナッピングの動作を追加
+            ) {
+                items(range.toList()) { item ->
+                    // アイテムが現在の選択された値と一致するか確認
+                    val isSelected = item == value
+                    val textModifier = Modifier.padding(vertical = 8.dp)
+                    Text(
+                        text = item.toString(),
+                        fontSize = 24.sp,
+                        //modifier = textModifier.clickable { onValueChange(item) },
+                        modifier = textModifier.clickable {
+                            // クリックされた場合、選択された値を更新
+                            onValueChange(item)
+                        },
+                        color = if (isSelected) Color.Black else Color.Gray
+                    )
+                }
+            }
+        }
+
+        // スクロールが停止した後に中央のアイテムに基づいて選択を更新
+        LaunchedEffect(listState.isScrollInProgress) {
+            if (!listState.isScrollInProgress) {
+                // 現在の表示リストの中央にある項目のインデックスを取得
+                val middleIndex = listState.firstVisibleItemIndex + (listState.layoutInfo.visibleItemsInfo.size / 2)
+                // インデックスが有効かつ範囲内であることを確認
+                val selectedItem = range.elementAtOrNull(middleIndex)
+                if (selectedItem != null && selectedItem != value) {
+                    onValueChange(selectedItem)
+                }
+            }
         }
     }
 }
