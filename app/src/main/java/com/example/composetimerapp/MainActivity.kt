@@ -600,6 +600,7 @@ fun WaitScreen(
             Text(
                 text = "着信まで",
                 style = MaterialTheme.typography.headlineMedium,
+                fontSize = 36.sp,  // フォントサイズを大きく
                 fontWeight = FontWeight.Bold,
                 color = MaterialTheme.colorScheme.primary,
                 modifier = Modifier.fillMaxWidth(),  // テキストを横幅いっぱいに広げる
