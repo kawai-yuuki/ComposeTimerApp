@@ -584,13 +584,13 @@ fun Picker(label: String,
     }
 
     // 初期値を1つ上にずらして設定
-    val listState = rememberLazyListState(initialFirstVisibleItemIndex = (infiniteList.size / 2) - 2)
+    val listState = rememberLazyListState(initialFirstVisibleItemIndex = (infiniteList.size / 2) - 1)
 
     Column(horizontalAlignment = Alignment.CenterHorizontally) {
 
         Box(
             modifier = Modifier
-                .height(220.dp) // 少し高さを持たせて中央を強調
+                .height(260.dp) // 少し高さを持たせて中央を強調
                 .width(120.dp)
                 .background(Color.LightGray) // 背景色で視認性を向上
         ) {
@@ -607,7 +607,7 @@ fun Picker(label: String,
                     Text(
                         text = displayValue.toString(),
                         fontSize = 48.sp,
-                        modifier = Modifier.padding(vertical = 8.dp),
+                        modifier = Modifier.padding(vertical = 16.dp),
                         color = if (isSelected) Color.Black else Color.Gray
                     )
                 }
