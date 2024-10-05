@@ -38,6 +38,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.core.app.NotificationCompat
@@ -325,7 +326,7 @@ fun TimerScreen(
         // タイマー表示
         Text(
             text = formatTime(if (isRunning) timeLeft else totalSelectedTime),
-            fontSize = 48.sp,
+            fontSize = 60.sp, // フォントサイズを大きく
             fontWeight = FontWeight.Bold,
             modifier = Modifier.padding(bottom = 32.dp)
         )
@@ -357,9 +358,11 @@ fun TimerScreen(
                             onPauseClick()
                         }
                     },
-                    modifier = Modifier.width(100.dp)
+                    modifier = Modifier
+                        .width(150.dp)  // ボタンの幅を広げる
+                        .padding(8.dp)  // パディングを追加して余裕を持たせる
                 ) {
-                    Text(if (isRunning) "一時停止" else "開始")
+                    Text("スタート", fontSize = 20.sp)  // テキストサイズを大きく
                 }
 
                 // リセットボタン
@@ -380,9 +383,11 @@ fun TimerScreen(
                             secondsListState.scrollToItem(0)
                         }
                     },
-                    modifier = Modifier.width(100.dp)
+                    modifier = Modifier
+                        .width(150.dp)
+                        .padding(8.dp)
                 ) {
-                    Text("リセット")
+                    Text("リセット", fontSize = 20.sp)
                 }
             }
         }
@@ -592,6 +597,14 @@ fun WaitScreen(
     ) {
         if (!isCalling) {
             // タイマーが動作中または停止中の通常表示
+            Text(
+                text = "着信まで",
+                style = MaterialTheme.typography.headlineMedium,
+                fontWeight = FontWeight.Bold,
+                color = MaterialTheme.colorScheme.primary,
+                modifier = Modifier.fillMaxWidth(),  // テキストを横幅いっぱいに広げる
+                textAlign = TextAlign.Center  // テキストを中央揃えにする
+            )
             Image(
                 painter = painterResource(id = R.drawable.timer_running_image),
                 contentDescription = "Timer Running",
@@ -601,6 +614,7 @@ fun WaitScreen(
             Text(
                 text = "残り時間: ${formatTime(time)}",
                 style = MaterialTheme.typography.headlineMedium,
+                fontSize = 36.sp  // フォントサイズを大きく
             )
 
             // ボタンコンテナ
@@ -612,9 +626,11 @@ fun WaitScreen(
                     onClick = {
                         onStartPauseClick(isRunning) // 停止ボタンが押されたときにタイマーを停止
                     },
-                    modifier = Modifier.width(100.dp)
+                    modifier = Modifier
+                        .width(150.dp)
+                        .padding(8.dp)
                 ) {
-                    Text(if (isRunning) "Pause" else "Start") // 状態に応じてボタン表示を変更
+                    Text(if (isRunning) "ストップ" else "スタート", fontSize = 20.sp)  // テキストサイズを大きく
                 }
 
                 // リセットボタン
@@ -625,9 +641,11 @@ fun WaitScreen(
                         isCalling = false // 通話状態のリセット
                         time = timeLeft // タイマーのリセット
                     },
-                    modifier = Modifier.width(100.dp)
+                    modifier = Modifier
+                        .width(150.dp)
+                        .padding(8.dp)
                 ) {
-                    Text("Reset")
+                    Text("リセット", fontSize = 20.sp)
                 }
             }
         } else {
@@ -641,10 +659,12 @@ fun WaitScreen(
                 contentScale = ContentScale.Fit // 画像が見切れないように収める
             )
             Text(
-                text = "足立さんから着信が来ています",
+                text = "足立さんから\n着信が来ています",
                 style = MaterialTheme.typography.headlineMedium,
                 fontWeight = FontWeight.Bold,
-                color = MaterialTheme.colorScheme.primary
+                color = MaterialTheme.colorScheme.primary,
+                modifier = Modifier.fillMaxWidth(),  // テキストを横幅いっぱいに広げる
+                textAlign = TextAlign.Center  // テキストを中央揃えにする
             )
 
             // 終了後の操作ボタン
@@ -657,9 +677,17 @@ fun WaitScreen(
                     isCalling = false
                     time  = timeLeft
                 },
-                modifier = Modifier.padding(top = 16.dp)
+                modifier = Modifier
+                    .width(200.dp)
+                    .padding(8.dp)
             ) {
-                Text("Reset Timer")
+                Text(
+                    text = "タイマーを\nリセットする",
+                    fontSize = 20.sp,
+                    lineHeight = 28.sp,  // 行間を広げる
+                    modifier = Modifier.fillMaxWidth(),  // テキストを横幅いっぱいに広げる
+                    textAlign = TextAlign.Center  // テキストを中央揃えにする
+                )
             }
         }
     }
