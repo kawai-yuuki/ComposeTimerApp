@@ -431,6 +431,27 @@ fun TimerScreen(
         verticalArrangement = Arrangement.Center,
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
+        Text(
+            text = "いつ電話を",
+            style = MaterialTheme.typography.headlineMedium,
+            fontSize = 50.sp,  // フォントサイズを大きく
+            fontWeight = FontWeight.Bold,
+            color = MaterialTheme.colorScheme.primary,
+            modifier = Modifier.fillMaxWidth(),  // テキストを横幅いっぱいに広げる
+            textAlign = TextAlign.Center  // テキストを中央揃えにする
+        )
+        Text(
+            text = "掛けてもらう？",
+            style = MaterialTheme.typography.headlineMedium,
+            fontSize = 50.sp,  // フォントサイズを大きく
+            fontWeight = FontWeight.Bold,
+            color = MaterialTheme.colorScheme.primary,
+            modifier = Modifier.fillMaxWidth(),  // テキストを横幅いっぱいに広げる
+            textAlign = TextAlign.Center  // テキストを中央揃えにする
+        )
+
+        Spacer(modifier = Modifier.height(32.dp))
+
         Row(
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.Center
@@ -766,18 +787,26 @@ fun WaitScreen(
                 modifier = Modifier.fillMaxWidth(),  // テキストを横幅いっぱいに広げる
                 textAlign = TextAlign.Center  // テキストを中央揃えにする
             )
+
             Image(
                 painter = painterResource(id = R.drawable.timer_running_image),
                 contentDescription = "Timer Running",
-                modifier = Modifier.size(400.dp),
-                contentScale = ContentScale.Crop
+                modifier = Modifier
+                    .size(400.dp)
+                    .fillMaxWidth(),// 横幅いっぱいに拡張
+                contentScale = ContentScale.Fit // 画像が見切れないように収める
             )
+
+            Spacer(modifier = Modifier.height(32.dp))
+
             Text(
                 text = "残り時間: ${formatTime(time)}",
                 fontWeight = FontWeight.Bold,
                 style = MaterialTheme.typography.headlineMedium,
-                fontSize = 40.sp  // フォントサイズを大きく
+                fontSize = 50.sp  // フォントサイズを大きく
             )
+
+            Spacer(modifier = Modifier.height(32.dp))
 
             // ボタンコンテナ
             Row(
@@ -837,6 +866,9 @@ fun WaitScreen(
                 //modifier = Modifier.fillMaxWidth(),  // テキストを横幅いっぱいに広げる
                 textAlign = TextAlign.Center  // テキストを中央揃えにする
             )
+
+            Spacer(modifier = Modifier.height(32.dp))
+
             // タイマーが終了したときの表示
             Image(
                 painter = painterResource(id = R.drawable.timer_finished_image),
@@ -846,6 +878,9 @@ fun WaitScreen(
                     .fillMaxWidth(),// 横幅いっぱいに拡張
                 contentScale = ContentScale.Fit // 画像が見切れないように収める
             )
+
+            Spacer(modifier = Modifier.height(32.dp))
+
             Text(
                 text = "運動しましょう",
                 fontSize = 50.sp,
@@ -855,6 +890,8 @@ fun WaitScreen(
                 modifier = Modifier.fillMaxWidth(),  // テキストを横幅いっぱいに広げる
                 textAlign = TextAlign.Center  // テキストを中央揃えにする
             )
+
+            Spacer(modifier = Modifier.height(32.dp))
 
             // 終了後の操作ボタン
             Button(
