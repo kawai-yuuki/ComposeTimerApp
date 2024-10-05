@@ -206,7 +206,7 @@ class IMUForegroundService : Service(), SensorEventListener {
 
                             // 一定時間後にフラグをリセット（例: 2秒後）
                             CoroutineScope(Dispatchers.Default).launch {
-                                delay(1000L) // 2秒待機
+                                delay(2000L) // 2秒待機
                                 SharedData.setIMUThresholdExceeded(false)
                                 Log.d("IMUService", "Acceleration threshold reset.")
                             }
@@ -337,13 +337,15 @@ fun StartScreen(onStartTransition: () -> Unit) {
             painter = painterResource(id = R.drawable.title_image),
             contentDescription = "Title",
             modifier = Modifier
-                .size(200.dp)
+                .size(400.dp)
                 .fillMaxWidth(),// 横幅いっぱいに拡張
             contentScale = ContentScale.Fit // 画像が見切れないように収める
         )
         Text(
             text = "足立さん",
+            fontSize = 60.sp,
             style = MaterialTheme.typography.headlineMedium,
+            fontWeight = FontWeight.Bold,
             modifier = Modifier.padding(bottom = 32.dp)
         )
     }
@@ -470,7 +472,7 @@ fun TimerScreen(
         // タイマー表示
         Text(
             text = formatTime(if (isRunning) timeLeft else totalSelectedTime),
-            fontSize = 60.sp, // フォントサイズを大きく
+            fontSize = 120.sp, // フォントサイズを大きく
             fontWeight = FontWeight.Bold,
             modifier = Modifier.padding(bottom = 32.dp)
         )
@@ -503,10 +505,14 @@ fun TimerScreen(
                         }
                     },
                     modifier = Modifier
-                        .width(150.dp)  // ボタンの幅を広げる
+                        .width(200.dp)  // ボタンの幅を広げる
                         .padding(8.dp)  // パディングを追加して余裕を持たせる
                 ) {
-                    Text("スタート", fontSize = 20.sp)  // テキストサイズを大きく
+                    Text(
+                        text = "スタート",
+                        fontSize = 20.sp,
+                        fontWeight = FontWeight.Bold  // テキスト全体を太字にする
+                    )
                 }
 
                 // リセットボタン
@@ -528,50 +534,17 @@ fun TimerScreen(
                         }
                     },
                     modifier = Modifier
-                        .width(150.dp)
+                        .width(200.dp)
                         .padding(8.dp)
                 ) {
-                    Text("リセット", fontSize = 20.sp)
+                    Text(
+                        text = "リセット",
+                        fontSize = 20.sp,
+                        fontWeight = FontWeight.Bold  // テキスト全体を太字にする
+                    )
                 }
             }
         }
-
-        /*
-        // テスト用バイブレーションボタンの追加
-        Spacer(modifier = Modifier.height(16.dp))
-        Button(
-            onClick = {
-                if (vibrator.hasVibrator()) {
-                    try {
-                        // バイブレーションパターンの定義
-                        val pattern = longArrayOf(0, 500, 200, 500) // 0ms待機、500ms振動、200ms待機、500ms振動
-                        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-                            vibrator.vibrate(
-                                VibrationEffect.createWaveform(
-                                    pattern,
-                                    -1 // 繰り返しなし
-                                )
-                            )
-                        } else {
-                            @Suppress("DEPRECATION")
-                            vibrator.vibrate(pattern, -1)
-                        }
-                        Toast.makeText(context, "バイブレーションを実行しました！", Toast.LENGTH_SHORT).show()
-                        Log.d("TimerScreen", "テストバイブレーションを実行しました。")
-                    } catch (e: Exception) {
-                        Log.e("TimerScreen", "テストバイブレーションに失敗しました: ${e.message}")
-                        Toast.makeText(context, "バイブレーションに失敗しました！", Toast.LENGTH_SHORT).show()
-                    }
-                } else {
-                    Log.e("TimerScreen", "デバイスはバイブレーションをサポートしていません。")
-                    Toast.makeText(context, "デバイスはバイブレーションをサポートしていません。", Toast.LENGTH_SHORT).show()
-                }
-            },
-            modifier = Modifier.width(200.dp)
-        ) {
-            Text("Test Vibration")
-        }
-        */
     }
 }
 
@@ -579,8 +552,7 @@ fun TimerScreen(
 fun Picker(label: String,
            value: Int,
            range: IntRange,
-           onValueChange: (Int) -> Unit,
-           //listState: LazyListState // 新しく追加
+           onValueChange: (Int) -> Unit
 ) {
     val itemCount = range.count()
 
@@ -591,15 +563,14 @@ fun Picker(label: String,
     }
 
     // 初期値を1つ上にずらして設定
-    val listState = rememberLazyListState(initialFirstVisibleItemIndex = (infiniteList.size / 2) - 1)
+    val listState = rememberLazyListState(initialFirstVisibleItemIndex = (infiniteList.size / 2) - 2)
 
     Column(horizontalAlignment = Alignment.CenterHorizontally) {
-        Text(text = label, fontSize = 18.sp, modifier = Modifier.padding(bottom = 8.dp))
 
         Box(
             modifier = Modifier
-                .height(130.dp) // 少し高さを持たせて中央を強調
-                .width(60.dp)
+                .height(220.dp) // 少し高さを持たせて中央を強調
+                .width(120.dp)
                 .background(Color.LightGray) // 背景色で視認性を向上
         ) {
             LazyColumn(
@@ -614,13 +585,14 @@ fun Picker(label: String,
                     val isSelected = displayValue == value
                     Text(
                         text = displayValue.toString(),
-                        fontSize = 24.sp,
+                        fontSize = 48.sp,
                         modifier = Modifier.padding(vertical = 8.dp),
                         color = if (isSelected) Color.Black else Color.Gray
                     )
                 }
             }
         }
+        Text(text = label, fontSize = 32.sp, modifier = Modifier.padding(bottom = 8.dp))
 
         // スクロールが停止した後に中央のアイテムに基づいて選択を更新
         LaunchedEffect(listState.isScrollInProgress) {
@@ -788,7 +760,7 @@ fun WaitScreen(
             Text(
                 text = "着信まで",
                 style = MaterialTheme.typography.headlineMedium,
-                fontSize = 36.sp,  // フォントサイズを大きく
+                fontSize = 40.sp,  // フォントサイズを大きく
                 fontWeight = FontWeight.Bold,
                 color = MaterialTheme.colorScheme.primary,
                 modifier = Modifier.fillMaxWidth(),  // テキストを横幅いっぱいに広げる
@@ -797,7 +769,7 @@ fun WaitScreen(
             Image(
                 painter = painterResource(id = R.drawable.timer_running_image),
                 contentDescription = "Timer Running",
-                modifier = Modifier.size(200.dp),
+                modifier = Modifier.size(400.dp),
                 contentScale = ContentScale.Crop
             )
             Text(
@@ -816,10 +788,14 @@ fun WaitScreen(
                         onStartPauseClick(isRunning) // 停止ボタンが押されたときにタイマーを停止
                     },
                     modifier = Modifier
-                        .width(150.dp)
+                        .width(200.dp)
                         .padding(8.dp)
                 ) {
-                    Text(if (isRunning) "ストップ" else "スタート", fontSize = 20.sp)  // テキストサイズを大きく
+                    Text(
+                        if (isRunning) "ストップ" else "スタート",
+                        fontSize = 20.sp,
+                        fontWeight = FontWeight.Bold  // テキスト全体を太字にする
+                        )
                 }
 
                 // リセットボタン
@@ -831,24 +807,47 @@ fun WaitScreen(
                         time = timeLeft // タイマーのリセット
                     },
                     modifier = Modifier
-                        .width(150.dp)
+                        .width(200.dp)
                         .padding(8.dp)
                 ) {
-                    Text("リセット", fontSize = 20.sp)
+                    Text(
+                        text = "リセット",
+                        fontSize = 20.sp,
+                        fontWeight = FontWeight.Bold  // テキスト全体を太字にする
+                    )
                 }
             }
         } else {
+            Text(
+                text = "足立さんから",
+                fontSize = 50.sp,
+                style = MaterialTheme.typography.headlineMedium,
+                fontWeight = FontWeight.Bold,
+                color = MaterialTheme.colorScheme.primary,
+                //modifier = Modifier.fillMaxWidth(),  // テキストを横幅いっぱいに広げる
+                textAlign = TextAlign.Center  // テキストを中央揃えにする
+            )
+            Text(
+                text = "着信が来ています",
+                fontSize = 50.sp,
+                style = MaterialTheme.typography.headlineMedium,
+                fontWeight = FontWeight.Bold,
+                color = MaterialTheme.colorScheme.primary,
+                //modifier = Modifier.fillMaxWidth(),  // テキストを横幅いっぱいに広げる
+                textAlign = TextAlign.Center  // テキストを中央揃えにする
+            )
             // タイマーが終了したときの表示
             Image(
                 painter = painterResource(id = R.drawable.timer_finished_image),
                 contentDescription = "Timer Finished",
                 modifier = Modifier
-                    .size(200.dp)
+                    .size(400.dp)
                     .fillMaxWidth(),// 横幅いっぱいに拡張
                 contentScale = ContentScale.Fit // 画像が見切れないように収める
             )
             Text(
-                text = "足立さんから\n着信が来ています",
+                text = "運動しましょう",
+                fontSize = 50.sp,
                 style = MaterialTheme.typography.headlineMedium,
                 fontWeight = FontWeight.Bold,
                 color = MaterialTheme.colorScheme.primary,
@@ -871,9 +870,8 @@ fun WaitScreen(
                     .padding(8.dp)
             ) {
                 Text(
-                    text = "タイマーを\nリセットする",
+                    text = "リセット",
                     fontSize = 20.sp,
-                    lineHeight = 28.sp,  // 行間を広げる
                     modifier = Modifier.fillMaxWidth(),  // テキストを横幅いっぱいに広げる
                     textAlign = TextAlign.Center  // テキストを中央揃えにする
                 )
