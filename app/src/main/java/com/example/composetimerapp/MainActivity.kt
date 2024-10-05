@@ -27,6 +27,7 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.snapping.rememberSnapFlingBehavior
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
@@ -42,7 +43,10 @@ import androidx.compose.ui.unit.sp
 import androidx.core.app.NotificationCompat
 import androidx.navigation.compose.*
 import com.example.composetimerapp.ui.theme.ComposeTimerAppTheme
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 
 // 時間を分:秒形式にフォーマットする関数（トップレベルに定義）
 @SuppressLint("DefaultLocale")
@@ -140,6 +144,11 @@ fun AppNavigation() {
                 },
                 onPauseClick = {
                     isRunning = false
+                },
+                onResetClick = {
+                    isRunning = false
+                    timeLeft = 60L // タイマーをリセット
+                    navController.navigate("timer")
                 }
             )
         }
@@ -202,7 +211,8 @@ fun TimerScreen(
     isRunning: Boolean,
     onTimeSet: (Long) -> Unit,
     onStartClick: () -> Unit,
-    onPauseClick: () -> Unit
+    onPauseClick: () -> Unit,
+    onResetClick: () -> Unit
 ) {
     // コンテキストの取得
     val context = LocalContext.current
@@ -219,9 +229,13 @@ fun TimerScreen(
     var selectedMinutes by remember { mutableStateOf(0) } // 初期値: 0分
     var selectedSeconds by remember { mutableStateOf(0) } // 初期値: 0秒
 
+    // LazyListState を作成
+    val hoursListState = rememberLazyListState()
+    val minutesListState = rememberLazyListState()
+    val secondsListState = rememberLazyListState()
+
     // タイマーの時間を計算
     val totalSelectedTime = (selectedHours * 3600 + selectedMinutes * 60 + selectedSeconds).toLong()
-
 
     // タイマーの実行
     LaunchedEffect(isRunning, timeLeft) {
@@ -279,7 +293,8 @@ fun TimerScreen(
                 label = "時間",
                 value = selectedHours,
                 range = 0..99,
-                onValueChange = { selectedHours = it }
+                onValueChange = { selectedHours = it },
+                listState = hoursListState
             )
 
             Spacer(modifier = Modifier.width(16.dp))
@@ -289,7 +304,8 @@ fun TimerScreen(
                 label = "分",
                 value = selectedMinutes,
                 range = 0..59,
-                onValueChange = { selectedMinutes = it }
+                onValueChange = { selectedMinutes = it },
+                listState = minutesListState
             )
 
             Spacer(modifier = Modifier.width(16.dp))
@@ -299,7 +315,8 @@ fun TimerScreen(
                 label = "秒",
                 value = selectedSeconds,
                 range = 0..59,
-                onValueChange = { selectedSeconds = it }
+                onValueChange = { selectedSeconds = it },
+                listState = secondsListState
             )
         }
 
@@ -348,10 +365,20 @@ fun TimerScreen(
                 // リセットボタン
                 Button(
                     onClick = {
+                        onResetClick()
                         //onTimeSet(60L) // 初期値にリセット
                         selectedHours = 0 // 0時間にリセット
                         selectedMinutes = 0 // 0分にリセット
                         selectedSeconds = 0 // 0秒にリセット
+
+                        /// リストの中央に0が来るようにスクロールさせる
+                        CoroutineScope(Dispatchers.Main).launch {
+
+                            // 各リストの0の位置にスクロール
+                            hoursListState.scrollToItem(0) // 0のインデックスに調整
+                            minutesListState.scrollToItem(0)
+                            secondsListState.scrollToItem(0)
+                        }
                     },
                     modifier = Modifier.width(100.dp)
                 ) {
@@ -400,10 +427,15 @@ fun TimerScreen(
 }
 
 @Composable
-fun Picker(label: String, value: Int, range: IntRange, onValueChange: (Int) -> Unit) {
+fun Picker(label: String,
+           value: Int,
+           range: IntRange,
+           onValueChange: (Int) -> Unit,
+           listState: LazyListState // 新しく追加
+) {
     val itemCount = range.count()
 
-    // 0..59を2回繰り返すリストを作成
+    // 0..59 or 0..99を2回繰り返すリストを作成
     val infiniteList = List(itemCount * 200) {
         if (it / itemCount % 2 == 0) it % itemCount   // 0..59 or 0..99
         else it % itemCount         // 0..59 or 0..99
@@ -411,7 +443,7 @@ fun Picker(label: String, value: Int, range: IntRange, onValueChange: (Int) -> U
 
     // 初期値を1つ上にずらして設定
     val listState = rememberLazyListState(initialFirstVisibleItemIndex = (infiniteList.size / 2) - 1)
-    
+
     Column(horizontalAlignment = Alignment.CenterHorizontally) {
         Text(text = label, fontSize = 18.sp, modifier = Modifier.padding(bottom = 8.dp))
 
