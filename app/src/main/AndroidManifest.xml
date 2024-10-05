@@ -10,9 +10,9 @@
         android:allowBackup="true"
         android:dataExtractionRules="@xml/data_extraction_rules"
         android:fullBackupContent="@xml/backup_rules"
-        android:icon="@mipmap/ic_launcher"
+        android:icon="@mipmap/adachisan"
         android:label="@string/app_name"
-        android:roundIcon="@mipmap/ic_launcher_round"
+        android:roundIcon="@mipmap/adachisan_round"
         android:supportsRtl="true"
         android:theme="@style/Theme.ComposeTimerApp"
         tools:targetApi="31">
@@ -32,6 +32,10 @@
             android:name=".TimerForegroundService"
             android:exported="false"
             android:foregroundServiceType="dataSync" />
+
+        <service
+            android:name=".IMUForegroundService"
+            android:exported="false" />
 
     </application>
 

@@ -12,6 +12,10 @@ import android.app.Service
 import android.content.Context
 import android.content.Context.VIBRATOR_SERVICE
 import android.content.Intent
+import android.hardware.Sensor
+import android.hardware.SensorEvent
+import android.hardware.SensorEventListener
+import android.hardware.SensorManager
 import android.os.Build
 import android.os.Bundle
 import android.os.IBinder
@@ -22,19 +26,32 @@ import android.util.Log
 import android.widget.Toast
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
+import androidx.compose.foundation.background
+import androidx.compose.foundation.gestures.snapping.rememberSnapFlingBehavior
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.core.app.NotificationCompat
 import androidx.navigation.compose.*
 import com.example.composetimerapp.ui.theme.ComposeTimerAppTheme
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.launch
+import kotlin.math.sqrt
 
 // 時間を分:秒形式にフォーマットする関数（トップレベルに定義）
 @SuppressLint("DefaultLocale")
@@ -42,6 +59,17 @@ fun formatTime(seconds: Long): String {
     val minutesPart = seconds / 60
     val secondsPart = seconds % 60
     return String.format("%02d:%02d", minutesPart, secondsPart)
+}
+
+object SharedData {
+    // IMUのしきい値を超えたかどうかを示すフラグ
+    private val _imuThresholdExceeded = MutableStateFlow(false)
+    val imuThresholdExceeded = _imuThresholdExceeded.asStateFlow()
+
+    // フラグを更新する関数
+    fun setIMUThresholdExceeded(exceeded: Boolean) {
+        _imuThresholdExceeded.value = exceeded
+    }
 }
 
 class MainActivity : ComponentActivity() {
@@ -109,6 +137,134 @@ class TimerForegroundService : Service() {
     }
 }
 
+class IMUForegroundService : Service(), SensorEventListener {
+
+    private lateinit var sensorManager: SensorManager
+    private var accelerometer: Sensor? = null
+    private var gyroscope: Sensor? = null
+
+    private val threshold = 20.0
+
+    override fun onCreate() {
+        super.onCreate()
+        sensorManager = getSystemService(Context.SENSOR_SERVICE) as SensorManager
+        accelerometer = sensorManager.getDefaultSensor(Sensor.TYPE_ACCELEROMETER)
+        gyroscope = sensorManager.getDefaultSensor(Sensor.TYPE_GYROSCOPE)
+    }
+
+    override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
+        // 通知の作成
+        val notification = createNotification()
+        startForeground(2, notification)
+
+        // センサーリスナーの登録
+        accelerometer?.also { accel ->
+            sensorManager.registerListener(this, accel, 100_000)
+        }
+        gyroscope?.also { gyro ->
+            sensorManager.registerListener(this, gyro, 100_000)
+        }
+
+        return START_STICKY
+    }
+
+    private fun createNotification(): Notification {
+        val channelId = "IMU_CHANNEL_ID"
+
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            val channel = NotificationChannel(
+                channelId,
+                "IMU Sensor Service",
+                NotificationManager.IMPORTANCE_LOW
+            )
+            val manager = getSystemService(NotificationManager::class.java)
+            manager.createNotificationChannel(channel)
+        }
+
+        return NotificationCompat.Builder(this, channelId)
+            .setContentTitle("IMU Service Running")
+            .setContentText("Collecting sensor data in background.")
+            .setSmallIcon(R.drawable.ic_timer) // 適切なアイコンに置き換えてください
+            .setPriority(NotificationCompat.PRIORITY_LOW)
+            .build()
+    }
+
+    override fun onSensorChanged(event: SensorEvent?) {
+        event?.let {
+            when (it.sensor.type) {
+                Sensor.TYPE_ACCELEROMETER -> {
+                    val x = it.values[0]
+                    val y = it.values[1]
+                    val z = it.values[2]
+                    val accelerationMagnitude = sqrt(x * x + y * y + z * z)
+                    Log.d("IMUService", "Accelerometer: x=$x, y=$y, z=$z, magnitude=$accelerationMagnitude")
+                    // しきい値を超えた場合の処理
+                    if (accelerationMagnitude > threshold) {
+                        if (!SharedData.imuThresholdExceeded.value) {
+                            SharedData.setIMUThresholdExceeded(true)
+                            Log.d("IMUService", "Acceleration threshold exceeded: $accelerationMagnitude")
+
+                            // 一定時間後にフラグをリセット（例: 2秒後）
+                            CoroutineScope(Dispatchers.Default).launch {
+                                delay(2000L) // 2秒待機
+                                SharedData.setIMUThresholdExceeded(false)
+                                Log.d("IMUService", "Acceleration threshold reset.")
+                            }
+                        } else {
+
+                        }
+                    } else {
+
+                    }
+                }
+                Sensor.TYPE_GYROSCOPE -> {
+                    val x = it.values[0]
+                    val y = it.values[1]
+                    val z = it.values[2]
+                    Log.d("IMUService", "Gyroscope: x=$x, y=$y, z=$z")
+                    // 必要に応じてデータを保存・送信
+                }
+                else -> {
+                    Log.d("IMUService", "Unhandled sensor type: ${it.sensor.type}")
+                }
+            }
+        }
+    }
+
+    override fun onAccuracyChanged(sensor: Sensor?, accuracy: Int) {
+        // 必要に応じて精度の変化を処理
+    }
+
+    override fun onDestroy() {
+        super.onDestroy()
+        sensorManager.unregisterListener(this)
+    }
+
+    override fun onBind(intent: Intent?): IBinder? {
+        return null
+    }
+}
+
+/**
+ * IMUForegroundService を開始する関数
+ */
+fun startIMUService(context: Context) {
+    val serviceIntent = Intent(context, IMUForegroundService::class.java)
+    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+        context.startForegroundService(serviceIntent)
+    } else {
+        context.startService(serviceIntent)
+    }
+}
+
+/**
+ * IMUForegroundService を停止する関数
+ */
+fun stopIMUService(context: Context) {
+    val serviceIntent = Intent(context, IMUForegroundService::class.java)
+    context.stopService(serviceIntent)
+}
+
 @Composable
 fun AppNavigation() {
     // timeLeftとisRunningの状態をAppNavigationで管理
@@ -133,6 +289,11 @@ fun AppNavigation() {
                 },
                 onPauseClick = {
                     isRunning = false
+                },
+                onResetClick = {
+                    isRunning = false
+                    timeLeft = 60L // タイマーをリセット
+                    navController.navigate("timer")
                 }
             )
         }
@@ -172,8 +333,16 @@ fun StartScreen(onStartTransition: () -> Unit) {
         verticalArrangement = Arrangement.Center,
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
+        Image(
+            painter = painterResource(id = R.drawable.title_image),
+            contentDescription = "Title",
+            modifier = Modifier
+                .size(200.dp)
+                .fillMaxWidth(),// 横幅いっぱいに拡張
+            contentScale = ContentScale.Fit // 画像が見切れないように収める
+        )
         Text(
-            text = "Welcome to Timer App",
+            text = "足立さん",
             style = MaterialTheme.typography.headlineMedium,
             modifier = Modifier.padding(bottom = 32.dp)
         )
@@ -187,7 +356,8 @@ fun TimerScreen(
     isRunning: Boolean,
     onTimeSet: (Long) -> Unit,
     onStartClick: () -> Unit,
-    onPauseClick: () -> Unit
+    onPauseClick: () -> Unit,
+    onResetClick: () -> Unit
 ) {
     // コンテキストの取得
     val context = LocalContext.current
@@ -199,9 +369,18 @@ fun TimerScreen(
         context.getSystemService(VIBRATOR_SERVICE) as Vibrator
     }
 
-    // スクロールによる時間設定用の状態
-    var selectedMinutes by remember { mutableFloatStateOf(1f) } // 初期値: 1分
-    var selectedSeconds by remember { mutableFloatStateOf(0f) } // 初期値: 0秒
+    // タイマー設定用の状態
+    var selectedHours by remember { mutableIntStateOf(0) } // 初期値: 0時間
+    var selectedMinutes by remember { mutableIntStateOf(0) } // 初期値: 0分
+    var selectedSeconds by remember { mutableIntStateOf(0) } // 初期値: 0秒
+
+    // LazyListState を作成
+    val hoursListState = rememberLazyListState()
+    val minutesListState = rememberLazyListState()
+    val secondsListState = rememberLazyListState()
+
+    // タイマーの時間を計算
+    val totalSelectedTime = (selectedHours * 3600 + selectedMinutes * 60 + selectedSeconds).toLong()
 
     // タイマーの実行
     LaunchedEffect(isRunning, timeLeft) {
@@ -250,42 +429,48 @@ fun TimerScreen(
         verticalArrangement = Arrangement.Center,
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
-        // 分の選択
-        Text(
-            text = "Minutes: ${selectedMinutes.toInt()}",
-            fontSize = 18.sp,
-            modifier = Modifier.padding(bottom = 8.dp)
-        )
-        Slider(
-            value = selectedMinutes,
-            onValueChange = { selectedMinutes = it },
-            valueRange = 0f..60f,
-            steps = 59, // 0から60までの整数を選択可能にする
-            modifier = Modifier.padding(horizontal = 16.dp)
-        )
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.Center
+        ) {
+            // 時間のピッカー
+            Picker(
+                label = "時間",
+                value = selectedHours,
+                range = 0..99,
+                onValueChange = { selectedHours = it },
+                //listState = hoursListState
+            )
 
-        Spacer(modifier = Modifier.height(24.dp))
+            Spacer(modifier = Modifier.width(16.dp))
 
-        // 秒の選択
-        Text(
-            text = "Seconds: ${selectedSeconds.toInt()}",
-            fontSize = 18.sp,
-            modifier = Modifier.padding(bottom = 8.dp)
-        )
-        Slider(
-            value = selectedSeconds,
-            onValueChange = { selectedSeconds = it },
-            valueRange = 0f..59f,
-            steps = 58, // 0から59までの整数を選択可能にする
-            modifier = Modifier.padding(horizontal = 16.dp)
-        )
+            // 分のピッカー
+            Picker(
+                label = "分",
+                value = selectedMinutes,
+                range = 0..59,
+                onValueChange = { selectedMinutes = it },
+                //listState = minutesListState
+            )
+
+            Spacer(modifier = Modifier.width(16.dp))
+
+            // 秒のピッカー
+            Picker(
+                label = "秒",
+                value = selectedSeconds,
+                range = 0..59,
+                onValueChange = { selectedSeconds = it },
+                //listState = secondsListState
+            )
+        }
 
         Spacer(modifier = Modifier.height(32.dp))
 
         // タイマー表示
         Text(
-            text = formatTime(timeLeft),
-            fontSize = 48.sp,
+            text = formatTime(if (isRunning) timeLeft else totalSelectedTime),
+            fontSize = 60.sp, // フォントサイズを大きく
             fontWeight = FontWeight.Bold,
             modifier = Modifier.padding(bottom = 32.dp)
         )
@@ -295,43 +480,63 @@ fun TimerScreen(
             horizontalArrangement = Arrangement.spacedBy(16.dp)
         ) {
             // スタート/ポーズボタン
-            Button(
-                onClick = {
-                    if (!isRunning) {
-                        // スクロールで選択された時間をタイマーに設定
-                        val totalSeconds = (selectedMinutes.toInt()*60+selectedSeconds.toInt()).toLong()
-                        val serviceIntent = Intent(context, TimerForegroundService::class.java)
-                        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-                            context.startForegroundService(serviceIntent)
-                        } else {
-                            context.startService(serviceIntent)
-                        }
-                        if (totalSeconds > 0) {
-                            onTimeSet(totalSeconds)
-                            onStartClick()
-                        }
-                    } else {
-                        onPauseClick()
-                    }
-                },
-                modifier = Modifier.width(100.dp)
-            ) {
-                Text(if (isRunning) "Pause" else "Start")
-            }
+            Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
+                Button(
+                    onClick = {
+                        if (!isRunning) {
+                            val totalSeconds = (selectedHours * 3600 + selectedMinutes * 60 + selectedSeconds).toLong()
 
-            // リセットボタン
-            Button(
-                onClick = {
-                    onTimeSet(60L) // 初期値にリセット
-                    selectedMinutes = 1f // 初期値にリセット（例: 1分）
-                    selectedSeconds = 0f // 初期値にリセット
-                },
-                modifier = Modifier.width(100.dp)
-            ) {
-                Text("Reset")
+                            //clickした際にバックグラウンドサービスを開始
+                            val serviceIntent = Intent(context, TimerForegroundService::class.java)
+                            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                                context.startForegroundService(serviceIntent)
+                            } else {
+                                context.startService(serviceIntent)
+                            }
+
+                            if (totalSeconds > 0) {
+                                onTimeSet(totalSeconds)
+                                onStartClick()
+                            }
+                        } else {
+                            onPauseClick()
+                        }
+                    },
+                    modifier = Modifier
+                        .width(150.dp)  // ボタンの幅を広げる
+                        .padding(8.dp)  // パディングを追加して余裕を持たせる
+                ) {
+                    Text("スタート", fontSize = 20.sp)  // テキストサイズを大きく
+                }
+
+                // リセットボタン
+                Button(
+                    onClick = {
+                        onResetClick()
+                        //onTimeSet(60L) // 初期値にリセット
+                        selectedHours = 0 // 0時間にリセット
+                        selectedMinutes = 0 // 0分にリセット
+                        selectedSeconds = 0 // 0秒にリセット
+
+                        /// リストの中央に0が来るようにスクロールさせる
+                        CoroutineScope(Dispatchers.Main).launch {
+
+                            // 各リストの0の位置にスクロール
+                            hoursListState.scrollToItem(0) // 0のインデックスに調整
+                            minutesListState.scrollToItem(0)
+                            secondsListState.scrollToItem(0)
+                        }
+                    },
+                    modifier = Modifier
+                        .width(150.dp)
+                        .padding(8.dp)
+                ) {
+                    Text("リセット", fontSize = 20.sp)
+                }
             }
         }
 
+        /*
         // テスト用バイブレーションボタンの追加
         Spacer(modifier = Modifier.height(16.dp))
         Button(
@@ -366,6 +571,76 @@ fun TimerScreen(
         ) {
             Text("Test Vibration")
         }
+        */
+    }
+}
+
+@Composable
+fun Picker(label: String,
+           value: Int,
+           range: IntRange,
+           onValueChange: (Int) -> Unit,
+           //listState: LazyListState // 新しく追加
+) {
+    val itemCount = range.count()
+
+    // 0..59 or 0..99を2回繰り返すリストを作成
+    val infiniteList = List(itemCount * 200) {
+        if (it / itemCount % 2 == 0) it % itemCount   // 0..59 or 0..99
+        else it % itemCount         // 0..59 or 0..99
+    }
+
+    // 初期値を1つ上にずらして設定
+    val listState = rememberLazyListState(initialFirstVisibleItemIndex = (infiniteList.size / 2) - 1)
+
+    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+        Text(text = label, fontSize = 18.sp, modifier = Modifier.padding(bottom = 8.dp))
+
+        Box(
+            modifier = Modifier
+                .height(130.dp) // 少し高さを持たせて中央を強調
+                .width(60.dp)
+                .background(Color.LightGray) // 背景色で視認性を向上
+        ) {
+            LazyColumn(
+                state = listState,
+                modifier = Modifier.fillMaxSize(),
+                horizontalAlignment = Alignment.CenterHorizontally,
+                flingBehavior = rememberSnapFlingBehavior(listState) // スナッピングの動作を追加
+            ) {
+                // リストを拡張して、0..59 -> 0..59 を無限に繰り返す
+                items(infiniteList) { item ->
+                    val displayValue = range.elementAt(item)
+                    val isSelected = displayValue == value
+                    Text(
+                        text = displayValue.toString(),
+                        fontSize = 24.sp,
+                        modifier = Modifier.padding(vertical = 8.dp),
+                        color = if (isSelected) Color.Black else Color.Gray
+                    )
+                }
+            }
+        }
+
+        // スクロールが停止した後に中央のアイテムに基づいて選択を更新
+        LaunchedEffect(listState.isScrollInProgress) {
+            if (!listState.isScrollInProgress) {
+                // 現在の表示リストの中央にある項目のインデックスを取得
+                val middleIndex = listState.firstVisibleItemIndex + (listState.layoutInfo.visibleItemsInfo.size / 2)
+                val selectedItem = infiniteList[middleIndex % infiniteList.size]
+
+                // 選択された秒数を更新
+                if (range.elementAt(selectedItem) != value) {
+                    onValueChange(range.elementAt(selectedItem))
+                }
+
+                // リストの範囲を超えた場合にジャンプして無限ループのように見せる
+                if (middleIndex < itemCount || middleIndex > infiniteList.size - itemCount) {
+                    listState.scrollToItem((infiniteList.size / 2) + value)
+                }
+
+            }
+        }
     }
 }
 
@@ -394,6 +669,9 @@ fun WaitScreen(
     // MediaPlayerのインスタンスを作成
     val mediaPlayer = remember { MediaPlayer.create(context, R.raw.ringtone) } // ringtone.mp3 を res/raw に置いたと仮定
     mediaPlayer.isLooping = true // 音楽を繰り返し再生する設定
+
+    // バイブレーションの状態を追跡
+    var isVibrating by remember { mutableStateOf(false) }
 
     // タイマーの実行
     LaunchedEffect(isRunning, time) {
@@ -435,7 +713,7 @@ fun WaitScreen(
             }
 
             // 5秒間待機
-            delay(5000L)
+            delay(10000L)
             vibrator?.cancel()
 
             // タイマーを再起動
@@ -451,6 +729,52 @@ fun WaitScreen(
         }
     }
 
+    // isCalling の状態に応じて IMU サービスを開始・停止
+    LaunchedEffect(isCalling) {
+        if (isCalling) {
+            startIMUService(context)
+            Toast.makeText(context, "IMUサービスを開始しました", Toast.LENGTH_SHORT).show()
+        } else {
+            stopIMUService(context)
+            Toast.makeText(context, "IMUサービスを停止しました", Toast.LENGTH_SHORT).show()
+        }
+    }
+
+    // SharedData.imuThresholdExceeded の状態に応じてバイブレーションを制御
+    val thresholdExceeded by SharedData.imuThresholdExceeded.collectAsState()
+
+    LaunchedEffect(thresholdExceeded, isCalling) {
+        if (isCalling) { // タイマーが終了している場合のみ
+            if (thresholdExceeded) {
+                if (isVibrating) {
+                    vibrator?.cancel()
+                    isVibrating = false
+                    //Toast.makeText(context, "しきい値を超えたため、バイブレーションを停止しました", Toast.LENGTH_SHORT).show()
+                }
+            } else {
+                if (!isVibrating) {
+                    try {
+                        val pattern = longArrayOf(0, 500, 200, 500) // 再度バイブレーションパターンを定義
+                        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                            vibrator?.vibrate(
+                                VibrationEffect.createWaveform(pattern, 0) // 無限ループ
+                            )
+                        } else {
+                            @Suppress("DEPRECATION")
+                            vibrator?.vibrate(pattern, 0)
+                        }
+                        isVibrating = true
+                        //Toast.makeText(context, "バイブレーションを再開しました", Toast.LENGTH_SHORT).show()
+                        //Log.d("WaitScreen", "バイブレーションを再開しました．")
+                    } catch (e: Exception) {
+                        //Log.e("WaitScreen", "バイブレーションの再開に失敗しました: ${e.message}")
+                        //Toast.makeText(context, "バイブレーションの再開に失敗しました！", Toast.LENGTH_SHORT).show()
+                    }
+                }
+            }
+        }
+    }
+
     // UIの構築
     Column(
         modifier = Modifier
@@ -461,6 +785,15 @@ fun WaitScreen(
     ) {
         if (!isCalling) {
             // タイマーが動作中または停止中の通常表示
+            Text(
+                text = "着信まで",
+                style = MaterialTheme.typography.headlineMedium,
+                fontSize = 36.sp,  // フォントサイズを大きく
+                fontWeight = FontWeight.Bold,
+                color = MaterialTheme.colorScheme.primary,
+                modifier = Modifier.fillMaxWidth(),  // テキストを横幅いっぱいに広げる
+                textAlign = TextAlign.Center  // テキストを中央揃えにする
+            )
             Image(
                 painter = painterResource(id = R.drawable.timer_running_image),
                 contentDescription = "Timer Running",
@@ -470,6 +803,7 @@ fun WaitScreen(
             Text(
                 text = "残り時間: ${formatTime(time)}",
                 style = MaterialTheme.typography.headlineMedium,
+                fontSize = 36.sp  // フォントサイズを大きく
             )
 
             // ボタンコンテナ
@@ -481,9 +815,11 @@ fun WaitScreen(
                     onClick = {
                         onStartPauseClick(isRunning) // 停止ボタンが押されたときにタイマーを停止
                     },
-                    modifier = Modifier.width(100.dp)
+                    modifier = Modifier
+                        .width(150.dp)
+                        .padding(8.dp)
                 ) {
-                    Text(if (isRunning) "Pause" else "Start") // 状態に応じてボタン表示を変更
+                    Text(if (isRunning) "ストップ" else "スタート", fontSize = 20.sp)  // テキストサイズを大きく
                 }
 
                 // リセットボタン
@@ -494,9 +830,11 @@ fun WaitScreen(
                         isCalling = false // 通話状態のリセット
                         time = timeLeft // タイマーのリセット
                     },
-                    modifier = Modifier.width(100.dp)
+                    modifier = Modifier
+                        .width(150.dp)
+                        .padding(8.dp)
                 ) {
-                    Text("Reset")
+                    Text("リセット", fontSize = 20.sp)
                 }
             }
         } else {
@@ -510,10 +848,12 @@ fun WaitScreen(
                 contentScale = ContentScale.Fit // 画像が見切れないように収める
             )
             Text(
-                text = "足立さんから着信が来ています",
+                text = "足立さんから\n着信が来ています",
                 style = MaterialTheme.typography.headlineMedium,
                 fontWeight = FontWeight.Bold,
-                color = MaterialTheme.colorScheme.primary
+                color = MaterialTheme.colorScheme.primary,
+                modifier = Modifier.fillMaxWidth(),  // テキストを横幅いっぱいに広げる
+                textAlign = TextAlign.Center  // テキストを中央揃えにする
             )
 
             // 終了後の操作ボタン
@@ -526,9 +866,17 @@ fun WaitScreen(
                     isCalling = false
                     time  = timeLeft
                 },
-                modifier = Modifier.padding(top = 16.dp)
+                modifier = Modifier
+                    .width(200.dp)
+                    .padding(8.dp)
             ) {
-                Text("Reset Timer")
+                Text(
+                    text = "タイマーを\nリセットする",
+                    fontSize = 20.sp,
+                    lineHeight = 28.sp,  // 行間を広げる
+                    modifier = Modifier.fillMaxWidth(),  // テキストを横幅いっぱいに広げる
+                    textAlign = TextAlign.Center  // テキストを中央揃えにする
+                )
             }
         }
     }
