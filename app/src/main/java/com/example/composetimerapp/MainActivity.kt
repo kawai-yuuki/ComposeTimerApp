@@ -323,6 +323,15 @@ fun TimerScreen(
                     onClick = {
                         if (!isRunning) {
                             val totalSeconds = (selectedHours * 3600 + selectedMinutes * 60 + selectedSeconds).toLong()
+
+                            //clickした際にバックグラウンドサービスを開始
+                            val serviceIntent = Intent(context, TimerForegroundService::class.java)
+                            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                                context.startForegroundService(serviceIntent)
+                            } else {
+                                context.startService(serviceIntent)
+                            }
+
                             if (totalSeconds > 0) {
                                 onTimeSet(totalSeconds)
                                 onStartClick()
@@ -339,7 +348,7 @@ fun TimerScreen(
                 // リセットボタン
                 Button(
                     onClick = {
-                        onTimeSet(60L) // 初期値にリセット
+                        //onTimeSet(60L) // 初期値にリセット
                         selectedHours = 0 // 0時間にリセット
                         selectedMinutes = 0 // 0分にリセット
                         selectedSeconds = 0 // 0秒にリセット
@@ -392,9 +401,17 @@ fun TimerScreen(
 
 @Composable
 fun Picker(label: String, value: Int, range: IntRange, onValueChange: (Int) -> Unit) {
-    // 現在の値の位置に基づいてピッカーを初期化する LazyListState を作成
-    val listState = rememberLazyListState(initialFirstVisibleItemIndex = value)
+    val itemCount = range.count()
 
+    // 0..59を2回繰り返すリストを作成
+    val infiniteList = List(itemCount * 200) {
+        if (it / itemCount % 2 == 0) it % itemCount   // 0..59 or 0..99
+        else it % itemCount         // 0..59 or 0..99
+    }
+
+    // 初期値を1つ上にずらして設定
+    val listState = rememberLazyListState(initialFirstVisibleItemIndex = (infiniteList.size / 2) - 1)
+    
     Column(horizontalAlignment = Alignment.CenterHorizontally) {
         Text(text = label, fontSize = 18.sp, modifier = Modifier.padding(bottom = 8.dp))
 
@@ -410,18 +427,14 @@ fun Picker(label: String, value: Int, range: IntRange, onValueChange: (Int) -> U
                 horizontalAlignment = Alignment.CenterHorizontally,
                 flingBehavior = rememberSnapFlingBehavior(listState) // スナッピングの動作を追加
             ) {
-                items(range.toList()) { item ->
-                    // アイテムが現在の選択された値と一致するか確認
-                    val isSelected = item == value
-                    val textModifier = Modifier.padding(vertical = 8.dp)
+                // リストを拡張して、0..59 -> 0..59 を無限に繰り返す
+                items(infiniteList) { item ->
+                    val displayValue = range.elementAt(item)
+                    val isSelected = displayValue == value
                     Text(
-                        text = item.toString(),
+                        text = displayValue.toString(),
                         fontSize = 24.sp,
-                        //modifier = textModifier.clickable { onValueChange(item) },
-                        modifier = textModifier.clickable {
-                            // クリックされた場合、選択された値を更新
-                            onValueChange(item)
-                        },
+                        modifier = Modifier.padding(vertical = 8.dp),
                         color = if (isSelected) Color.Black else Color.Gray
                     )
                 }
@@ -433,14 +446,26 @@ fun Picker(label: String, value: Int, range: IntRange, onValueChange: (Int) -> U
             if (!listState.isScrollInProgress) {
                 // 現在の表示リストの中央にある項目のインデックスを取得
                 val middleIndex = listState.firstVisibleItemIndex + (listState.layoutInfo.visibleItemsInfo.size / 2)
-                // インデックスが有効かつ範囲内であることを確認
-                val selectedItem = range.elementAtOrNull(middleIndex)
-                if (selectedItem != null && selectedItem != value) {
-                    onValueChange(selectedItem)
+                val selectedItem = infiniteList[middleIndex % infiniteList.size]
+
+                // 選択された秒数を更新
+                if (range.elementAt(selectedItem) != value) {
+                    onValueChange(range.elementAt(selectedItem))
                 }
+
+                // リストの範囲を超えた場合にジャンプして無限ループのように見せる
+                if (middleIndex < itemCount || middleIndex > infiniteList.size - itemCount) {
+                    listState.scrollToItem((infiniteList.size / 2) + value)
+                }
+
             }
         }
     }
+}
+
+// リストを繰り返す拡張関数
+fun <T> List<T>.repeat(times: Int): List<T> {
+    return List(this.size * times) { this[it % this.size] }
 }
 
 @Composable
