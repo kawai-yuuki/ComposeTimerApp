@@ -439,7 +439,7 @@ fun TimerScreen(
             Picker(
                 label = "時間",
                 value = selectedHours,
-                range = 0..99,
+                range = 0..2,
                 onValueChange = { selectedHours = it },
                 //listState = hoursListState
             )
@@ -760,7 +760,7 @@ fun WaitScreen(
             Text(
                 text = "着信まで",
                 style = MaterialTheme.typography.headlineMedium,
-                fontSize = 40.sp,  // フォントサイズを大きく
+                fontSize = 50.sp,  // フォントサイズを大きく
                 fontWeight = FontWeight.Bold,
                 color = MaterialTheme.colorScheme.primary,
                 modifier = Modifier.fillMaxWidth(),  // テキストを横幅いっぱいに広げる
@@ -774,8 +774,9 @@ fun WaitScreen(
             )
             Text(
                 text = "残り時間: ${formatTime(time)}",
+                fontWeight = FontWeight.Bold,
                 style = MaterialTheme.typography.headlineMedium,
-                fontSize = 36.sp  // フォントサイズを大きく
+                fontSize = 40.sp  // フォントサイズを大きく
             )
 
             // ボタンコンテナ
