@@ -206,7 +206,7 @@ class IMUForegroundService : Service(), SensorEventListener {
 
                             // 一定時間後にフラグをリセット（例: 2秒後）
                             CoroutineScope(Dispatchers.Default).launch {
-                                delay(2000L) // 2秒待機
+                                delay(1000L) // 2秒待機
                                 SharedData.setIMUThresholdExceeded(false)
                                 Log.d("IMUService", "Acceleration threshold reset.")
                             }
