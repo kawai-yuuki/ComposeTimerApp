@@ -23,13 +23,10 @@ import android.widget.Toast
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.snapping.rememberSnapFlingBehavior
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -226,9 +223,9 @@ fun TimerScreen(
     }
 
     // タイマー設定用の状態
-    var selectedHours by remember { mutableStateOf(0) } // 初期値: 0時間
-    var selectedMinutes by remember { mutableStateOf(0) } // 初期値: 0分
-    var selectedSeconds by remember { mutableStateOf(0) } // 初期値: 0秒
+    var selectedHours by remember { mutableIntStateOf(0) } // 初期値: 0時間
+    var selectedMinutes by remember { mutableIntStateOf(0) } // 初期値: 0分
+    var selectedSeconds by remember { mutableIntStateOf(0) } // 初期値: 0秒
 
     // LazyListState を作成
     val hoursListState = rememberLazyListState()
@@ -295,7 +292,7 @@ fun TimerScreen(
                 value = selectedHours,
                 range = 0..99,
                 onValueChange = { selectedHours = it },
-                listState = hoursListState
+                //listState = hoursListState
             )
 
             Spacer(modifier = Modifier.width(16.dp))
@@ -306,7 +303,7 @@ fun TimerScreen(
                 value = selectedMinutes,
                 range = 0..59,
                 onValueChange = { selectedMinutes = it },
-                listState = minutesListState
+                //listState = minutesListState
             )
 
             Spacer(modifier = Modifier.width(16.dp))
@@ -317,7 +314,7 @@ fun TimerScreen(
                 value = selectedSeconds,
                 range = 0..59,
                 onValueChange = { selectedSeconds = it },
-                listState = secondsListState
+                //listState = secondsListState
             )
         }
 
@@ -436,7 +433,7 @@ fun Picker(label: String,
            value: Int,
            range: IntRange,
            onValueChange: (Int) -> Unit,
-           listState: LazyListState // 新しく追加
+           //listState: LazyListState // 新しく追加
 ) {
     val itemCount = range.count()
 
@@ -498,11 +495,6 @@ fun Picker(label: String,
             }
         }
     }
-}
-
-// リストを繰り返す拡張関数
-fun <T> List<T>.repeat(times: Int): List<T> {
-    return List(this.size * times) { this[it % this.size] }
 }
 
 @Composable
