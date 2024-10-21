@@ -5,4 +5,6 @@
     - 1st year graduate student in the master's program at Tokyo Denki University
     - IoE/M2M Solution Lab
 - Ryo Komoda
-    - プロプロのぷよ
+    - 1st year graduate student in the master's program at Tokyo Denki University
+    - IoE/M2M Solution Lab
+    - my favorite game: ぷよぷよ
