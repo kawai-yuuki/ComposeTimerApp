@@ -37,6 +37,7 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -267,6 +268,11 @@ fun stopIMUService(context: Context) {
 
 @Composable
 fun AppNavigation() {
+    // 20241228動的にデバイスの画面を変える要に変更
+    //アプリ全体でその画面に対する動的な値を定義
+    val configuration = LocalConfiguration.current
+    val screenWidth = remember { configuration.screenWidthDp }
+    val screenHeight = remember { configuration.screenHeightDp }
     // timeLeftとisRunningの状態をAppNavigationで管理
     var timeLeft by remember { mutableLongStateOf(60L) }
     var isRunning by remember { mutableStateOf(false) }
@@ -275,11 +281,16 @@ fun AppNavigation() {
     NavHost(navController, startDestination = "start") {
         // Start page
         composable("start") {
-            StartScreen(onStartTransition = { navController.navigate("timer") })
+            StartScreen(
+                screenWidth = screenWidth,
+                onStartTransition = { navController.navigate("timer") }
+            )
         }
         // Time setting page
         composable("timer") {
             TimerScreen(
+                screenWidth = screenWidth,
+                screenHeight = screenHeight,
                 timeLeft = timeLeft,
                 isRunning = isRunning,
                 onTimeSet = { newTime -> timeLeft = newTime },
@@ -300,6 +311,8 @@ fun AppNavigation() {
         // waiting call page
         composable("wait") {
             WaitScreen(
+                screenWidth = screenWidth,
+                screenHeight = screenHeight,
                 timeLeft = timeLeft,
                 isRunning = isRunning,
                 onStartPauseClick = {
@@ -319,7 +332,10 @@ fun AppNavigation() {
 }
 
 @Composable
-fun StartScreen(onStartTransition: () -> Unit) {
+fun StartScreen(
+    screenWidth: Int,
+    onStartTransition: () -> Unit
+) {
     // 自動遷移を実装
     LaunchedEffect(Unit) {
         delay(2000L) // 2秒待機
@@ -337,13 +353,13 @@ fun StartScreen(onStartTransition: () -> Unit) {
             painter = painterResource(id = R.drawable.title_image),
             contentDescription = "Title",
             modifier = Modifier
-                .size(400.dp)
+                .size(300.dp)
                 .fillMaxWidth(),// 横幅いっぱいに拡張
             contentScale = ContentScale.Fit // 画像が見切れないように収める
         )
         Text(
             text = "足立さん",
-            fontSize = 60.sp,
+            fontSize = (screenWidth/8).sp,
             style = MaterialTheme.typography.headlineMedium,
             fontWeight = FontWeight.Bold,
             modifier = Modifier.padding(bottom = 32.dp)
@@ -354,6 +370,8 @@ fun StartScreen(onStartTransition: () -> Unit) {
 @SuppressLint("UnusedMaterial3ScaffoldPaddingParameter")
 @Composable
 fun TimerScreen(
+    screenWidth: Int,
+    screenHeight: Int,
     timeLeft: Long,
     isRunning: Boolean,
     onTimeSet: (Long) -> Unit,
@@ -434,7 +452,7 @@ fun TimerScreen(
         Text(
             text = "いつ電話を",
             style = MaterialTheme.typography.headlineMedium,
-            fontSize = 50.sp,  // フォントサイズを大きく
+            fontSize = (screenWidth/10).sp,  // フォントサイズを大きく
             fontWeight = FontWeight.Bold,
             color = MaterialTheme.colorScheme.primary,
             modifier = Modifier.fillMaxWidth(),  // テキストを横幅いっぱいに広げる
@@ -443,14 +461,14 @@ fun TimerScreen(
         Text(
             text = "掛けてもらう？",
             style = MaterialTheme.typography.headlineMedium,
-            fontSize = 50.sp,  // フォントサイズを大きく
+            fontSize = (screenWidth/10).sp,  // フォントサイズを大きく
             fontWeight = FontWeight.Bold,
             color = MaterialTheme.colorScheme.primary,
             modifier = Modifier.fillMaxWidth(),  // テキストを横幅いっぱいに広げる
             textAlign = TextAlign.Center  // テキストを中央揃えにする
         )
 
-        Spacer(modifier = Modifier.height(32.dp))
+        Spacer(modifier = Modifier.height((screenHeight/20).dp))
 
         Row(
             verticalAlignment = Alignment.CenterVertically,
@@ -458,122 +476,126 @@ fun TimerScreen(
         ) {
             // 時間のピッカー
             Picker(
+                screenWidth = screenWidth,
+                screenHeight = screenHeight,
                 label = "時間",
                 value = selectedHours,
                 range = 0..2,
-                onValueChange = { selectedHours = it },
-                //listState = hoursListState
+                onValueChange = { selectedHours = it }
             )
 
-            Spacer(modifier = Modifier.width(16.dp))
+            Spacer(modifier = Modifier.width((screenWidth/30).dp))
 
             // 分のピッカー
             Picker(
+                screenWidth = screenWidth,
+                screenHeight = screenHeight,
                 label = "分",
                 value = selectedMinutes,
                 range = 0..59,
-                onValueChange = { selectedMinutes = it },
-                //listState = minutesListState
+                onValueChange = { selectedMinutes = it }
             )
 
-            Spacer(modifier = Modifier.width(16.dp))
+            Spacer(modifier = Modifier.width((screenWidth/30).dp))
 
             // 秒のピッカー
             Picker(
+                screenWidth = screenWidth,
+                screenHeight = screenHeight,
                 label = "秒",
                 value = selectedSeconds,
                 range = 0..59,
-                onValueChange = { selectedSeconds = it },
-                //listState = secondsListState
+                onValueChange = { selectedSeconds = it }
             )
         }
 
-        Spacer(modifier = Modifier.height(32.dp))
+        Spacer(modifier = Modifier.height((screenHeight/20).dp))
 
         // タイマー表示
         Text(
             text = formatTime(if (isRunning) timeLeft else totalSelectedTime),
-            fontSize = 120.sp, // フォントサイズを大きく
+            fontSize = (screenWidth/4).sp, // フォントサイズを大きく
             fontWeight = FontWeight.Bold,
             modifier = Modifier.padding(bottom = 32.dp)
         )
 
         // ボタンコンテナ
         Row(
-            horizontalArrangement = Arrangement.spacedBy(16.dp)
+            horizontalArrangement = Arrangement.spacedBy(2.dp)
         ) {
             // スタート/ポーズボタン
-            Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
-                Button(
-                    onClick = {
-                        if (!isRunning) {
-                            val totalSeconds = (selectedHours * 3600 + selectedMinutes * 60 + selectedSeconds).toLong()
+            Button(
+                onClick = {
+                    if (!isRunning) {
+                        val totalSeconds = (selectedHours * 3600 + selectedMinutes * 60 + selectedSeconds).toLong()
 
-                            //clickした際にバックグラウンドサービスを開始
-                            val serviceIntent = Intent(context, TimerForegroundService::class.java)
-                            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-                                context.startForegroundService(serviceIntent)
-                            } else {
-                                context.startService(serviceIntent)
-                            }
-
-                            if (totalSeconds > 0) {
-                                onTimeSet(totalSeconds)
-                                onStartClick()
-                            }
+                        //clickした際にバックグラウンドサービスを開始
+                        val serviceIntent = Intent(context, TimerForegroundService::class.java)
+                        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                            context.startForegroundService(serviceIntent)
                         } else {
-                            onPauseClick()
+                            context.startService(serviceIntent)
                         }
-                    },
-                    modifier = Modifier
-                        .width(200.dp)  // ボタンの幅を広げる
-                        .padding(8.dp)  // パディングを追加して余裕を持たせる
-                ) {
-                    Text(
-                        text = "スタート",
-                        fontSize = 20.sp,
-                        fontWeight = FontWeight.Bold  // テキスト全体を太字にする
-                    )
-                }
 
-                // リセットボタン
-                Button(
-                    onClick = {
-                        onResetClick()
-                        //onTimeSet(60L) // 初期値にリセット
-                        selectedHours = 0 // 0時間にリセット
-                        selectedMinutes = 0 // 0分にリセット
-                        selectedSeconds = 0 // 0秒にリセット
-
-                        /// リストの中央に0が来るようにスクロールさせる
-                        CoroutineScope(Dispatchers.Main).launch {
-
-                            // 各リストの0の位置にスクロール
-                            hoursListState.scrollToItem(0) // 0のインデックスに調整
-                            minutesListState.scrollToItem(0)
-                            secondsListState.scrollToItem(0)
+                        if (totalSeconds > 0) {
+                            onTimeSet(totalSeconds)
+                            onStartClick()
                         }
-                    },
-                    modifier = Modifier
-                        .width(200.dp)
-                        .padding(8.dp)
-                ) {
-                    Text(
-                        text = "リセット",
-                        fontSize = 20.sp,
-                        fontWeight = FontWeight.Bold  // テキスト全体を太字にする
-                    )
-                }
+                    } else {
+                        onPauseClick()
+                    }
+                },
+                modifier = Modifier
+                    //.width((screenWidth/2).dp)  // ボタンの幅を広げる
+                    .padding(8.dp)  // パディングを追加して余裕を持たせる
+            ) {
+                Text(
+                    text = "スタート",
+                    fontSize = (screenWidth/20).sp,
+                    fontWeight = FontWeight.Bold  // テキスト全体を太字にする
+                )
+            }
+
+            // リセットボタン
+            Button(
+                onClick = {
+                    onResetClick()
+                    //onTimeSet(60L) // 初期値にリセット
+                    selectedHours = 0 // 0時間にリセット
+                    selectedMinutes = 0 // 0分にリセット
+                    selectedSeconds = 0 // 0秒にリセット
+
+                    /// リストの中央に0が来るようにスクロールさせる
+                    CoroutineScope(Dispatchers.Main).launch {
+
+                        // 各リストの0の位置にスクロール
+                        hoursListState.scrollToItem(0) // 0のインデックスに調整
+                        minutesListState.scrollToItem(0)
+                        secondsListState.scrollToItem(0)
+                    }
+                },
+                modifier = Modifier
+                    //.width((screenWidth/2).dp)
+                    .padding(8.dp)
+            ) {
+                Text(
+                    text = "リセット",
+                    fontSize = (screenWidth/20).sp,
+                    fontWeight = FontWeight.Bold  // テキスト全体を太字にする
+                )
             }
         }
     }
 }
 
 @Composable
-fun Picker(label: String,
-           value: Int,
-           range: IntRange,
-           onValueChange: (Int) -> Unit
+fun Picker(
+    screenWidth: Int,
+    screenHeight: Int,
+    label: String,
+    value: Int,
+    range: IntRange,
+    onValueChange: (Int) -> Unit
 ) {
     val itemCount = range.count()
 
@@ -590,8 +612,9 @@ fun Picker(label: String,
 
         Box(
             modifier = Modifier
-                .height(260.dp) // 少し高さを持たせて中央を強調
-                .width(120.dp)
+                .height((screenHeight/3).dp) // 少し高さを持たせて中央を強調
+                //エミュレーターは3.5くらい、スマホは3で上手くいく。
+                .width((screenWidth/5).dp)
                 .background(Color.LightGray) // 背景色で視認性を向上
         ) {
             LazyColumn(
@@ -606,14 +629,18 @@ fun Picker(label: String,
                     val isSelected = displayValue == value
                     Text(
                         text = displayValue.toString(),
-                        fontSize = 48.sp,
+                        fontSize = (screenWidth/8).sp,
                         modifier = Modifier.padding(vertical = 16.dp),
                         color = if (isSelected) Color.Black else Color.Gray
                     )
                 }
             }
         }
-        Text(text = label, fontSize = 32.sp, modifier = Modifier.padding(bottom = 8.dp))
+        Text(
+            text = label,
+            fontSize = (screenWidth/10).sp,
+            modifier = Modifier.padding(bottom = 8.dp)
+        )
 
         // スクロールが停止した後に中央のアイテムに基づいて選択を更新
         LaunchedEffect(listState.isScrollInProgress) {
@@ -639,6 +666,8 @@ fun Picker(label: String,
 
 @Composable
 fun WaitScreen(
+    screenWidth: Int,
+    screenHeight: Int,
     timeLeft: Long,
     isRunning: Boolean,
     onStartPauseClick: (Boolean) -> Unit, // 停止ボタン用のコールバックを追加
@@ -781,7 +810,7 @@ fun WaitScreen(
             Text(
                 text = "着信まで",
                 style = MaterialTheme.typography.headlineMedium,
-                fontSize = 50.sp,  // フォントサイズを大きく
+                fontSize = (screenWidth/10).sp,  // フォントサイズを大きく
                 fontWeight = FontWeight.Bold,
                 color = MaterialTheme.colorScheme.primary,
                 modifier = Modifier.fillMaxWidth(),  // テキストを横幅いっぱいに広げる
@@ -803,10 +832,10 @@ fun WaitScreen(
                 text = "残り時間: ${formatTime(time)}",
                 fontWeight = FontWeight.Bold,
                 style = MaterialTheme.typography.headlineMedium,
-                fontSize = 50.sp  // フォントサイズを大きく
+                fontSize = (screenWidth/10).sp  // フォントサイズを大きく
             )
 
-            Spacer(modifier = Modifier.height(32.dp))
+            Spacer(modifier = Modifier.height((screenHeight/20).dp))
 
             // ボタンコンテナ
             Row(
@@ -818,12 +847,12 @@ fun WaitScreen(
                         onStartPauseClick(isRunning) // 停止ボタンが押されたときにタイマーを停止
                     },
                     modifier = Modifier
-                        .width(200.dp)
+                        //.width((screenWidth/2).dp)
                         .padding(8.dp)
                 ) {
                     Text(
                         if (isRunning) "ストップ" else "スタート",
-                        fontSize = 20.sp,
+                        fontSize = (screenWidth/20).sp,
                         fontWeight = FontWeight.Bold  // テキスト全体を太字にする
                         )
                 }
@@ -837,12 +866,12 @@ fun WaitScreen(
                         time = timeLeft // タイマーのリセット
                     },
                     modifier = Modifier
-                        .width(200.dp)
+                        //.width((screenWidth/2).dp)
                         .padding(8.dp)
                 ) {
                     Text(
                         text = "リセット",
-                        fontSize = 20.sp,
+                        fontSize = (screenWidth/20).sp,
                         fontWeight = FontWeight.Bold  // テキスト全体を太字にする
                     )
                 }
@@ -850,7 +879,7 @@ fun WaitScreen(
         } else {
             Text(
                 text = "足立さんから",
-                fontSize = 50.sp,
+                fontSize = (screenWidth/10).sp,
                 style = MaterialTheme.typography.headlineMedium,
                 fontWeight = FontWeight.Bold,
                 color = MaterialTheme.colorScheme.primary,
@@ -859,7 +888,7 @@ fun WaitScreen(
             )
             Text(
                 text = "着信が来ています",
-                fontSize = 50.sp,
+                fontSize = (screenWidth/10).sp,
                 style = MaterialTheme.typography.headlineMedium,
                 fontWeight = FontWeight.Bold,
                 color = MaterialTheme.colorScheme.primary,
@@ -867,23 +896,23 @@ fun WaitScreen(
                 textAlign = TextAlign.Center  // テキストを中央揃えにする
             )
 
-            Spacer(modifier = Modifier.height(32.dp))
+            Spacer(modifier = Modifier.height((screenHeight/20).dp))
 
             // タイマーが終了したときの表示
             Image(
                 painter = painterResource(id = R.drawable.timer_finished_image),
                 contentDescription = "Timer Finished",
                 modifier = Modifier
-                    .size(400.dp)
+                    .size(300.dp)
                     .fillMaxWidth(),// 横幅いっぱいに拡張
                 contentScale = ContentScale.Fit // 画像が見切れないように収める
             )
 
-            Spacer(modifier = Modifier.height(32.dp))
+            Spacer(modifier = Modifier.height((screenHeight/20).dp))
 
             Text(
                 text = "運動しましょう",
-                fontSize = 50.sp,
+                fontSize = (screenWidth/10).sp,
                 style = MaterialTheme.typography.headlineMedium,
                 fontWeight = FontWeight.Bold,
                 color = MaterialTheme.colorScheme.primary,
@@ -891,7 +920,7 @@ fun WaitScreen(
                 textAlign = TextAlign.Center  // テキストを中央揃えにする
             )
 
-            Spacer(modifier = Modifier.height(32.dp))
+            Spacer(modifier = Modifier.height((screenHeight/20).dp))
 
             // 終了後の操作ボタン
             Button(
@@ -904,12 +933,12 @@ fun WaitScreen(
                     time  = timeLeft
                 },
                 modifier = Modifier
-                    .width(200.dp)
+                    //.width(200.dp)
                     .padding(8.dp)
             ) {
                 Text(
                     text = "リセット",
-                    fontSize = 20.sp,
+                    fontSize = (screenWidth/20).sp,
                     modifier = Modifier.fillMaxWidth(),  // テキストを横幅いっぱいに広げる
                     textAlign = TextAlign.Center  // テキストを中央揃えにする
                 )
