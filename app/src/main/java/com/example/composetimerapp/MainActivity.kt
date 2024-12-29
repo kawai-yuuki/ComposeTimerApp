@@ -468,7 +468,7 @@ fun TimerScreen(
             textAlign = TextAlign.Center  // テキストを中央揃えにする
         )
 
-        Spacer(modifier = Modifier.height((screenHeight/20).dp))
+        Spacer(modifier = Modifier.height((screenHeight/30).dp))
 
         Row(
             verticalAlignment = Alignment.CenterVertically,
@@ -509,7 +509,7 @@ fun TimerScreen(
             )
         }
 
-        Spacer(modifier = Modifier.height((screenHeight/20).dp))
+        Spacer(modifier = Modifier.height((screenHeight/30).dp))
 
         // タイマー表示
         Text(
@@ -826,7 +826,7 @@ fun WaitScreen(
                 contentScale = ContentScale.Fit // 画像が見切れないように収める
             )
 
-            Spacer(modifier = Modifier.height(32.dp))
+            Spacer(modifier = Modifier.height((screenHeight/30).dp))
 
             Text(
                 text = "残り時間: ${formatTime(time)}",
@@ -835,7 +835,7 @@ fun WaitScreen(
                 fontSize = (screenWidth/10).sp  // フォントサイズを大きく
             )
 
-            Spacer(modifier = Modifier.height((screenHeight/20).dp))
+            Spacer(modifier = Modifier.height((screenHeight/30).dp))
 
             // ボタンコンテナ
             Row(
